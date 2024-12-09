@@ -1,0 +1,40 @@
+{
+    "name": "fullstack-disruption",
+    "version": "1.0.0",
+    "private": true,
+    "description": "Combined Frontend (Velzon) and Backend",
+    "scripts": {
+        "start:frontend": "cd Frontend && npm start",
+        "start:backend": "cd Backend && nodemon app.js",
+        "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\""
+    },
+    "devDependencies": {
+        "@types/lodash": "^4.17.0",
+        "@types/react-bootstrap-table2-paginator": "^2.1.6",
+        "@types/react-bootstrap-table2-toolkit": "^2.1.13",
+        "case-sensitive-paths-webpack-plugin": "^2.4.0",
+        "concurrently": "^8.2.2",
+        "nodemon": "^3.1.7"
+    },
+    "engines": {
+        "node": "20.x"
+    },
+    "browserslist": {
+        "production": [
+            ">0.2%",
+            "not dead",
+            "not op_mini all"
+        ],
+        "development": [
+            "last 1 chrome version",
+            "last 1 firefox version",
+            "last 1 safari version"
+        ]
+    },
+    "dependencies": {
+        "@tanstack/match-sorter-utils": "^8.19.4",
+        "@tanstack/react-table": "^8.20.5",
+        "google-maps-react": "^2.0.6",
+        "reactstrap": "^9.2.3"
+    }
+}

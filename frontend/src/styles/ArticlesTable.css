@@ -1,0 +1,24 @@
+.table-container {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: #ffffff;
+  }
+  
+  .table-container .table {
+    margin: 0;
+  }
+  
+  .table-container th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+  }
+  
+  .table-container td {
+    vertical-align: middle;
+  }
+  
+  .underline {
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  
