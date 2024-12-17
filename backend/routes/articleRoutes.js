@@ -5,6 +5,7 @@ const {
   getAllArticles, 
   getFilteredArticles,
   getArticleById,
+  getKeywordCloud,
   deleteArticle,
 } = require('../controllers/articlesController.js');
 
@@ -13,6 +14,8 @@ router.post('/scrape', scrapeAndSaveArticles);
 
 // Route to get all articles (with optional filtering)
 router.get('/', getFilteredArticles);
+
+router.get("/keywords", getKeywordCloud);
 
 // Route to get a single article by ID
 router.get('/:id', getArticleById);

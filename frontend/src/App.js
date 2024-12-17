@@ -7,7 +7,6 @@ const App = () => {
   return (
     <Router>
       <Routes>
-        {/* Tambahkan route ke Homepage */}
         <Route path="/" element={<Homepage />} />
       </Routes>
     </Router>

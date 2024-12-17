@@ -1,7 +1,15 @@
 import axios from "axios";
 import React, { useEffect, useState } from "react";
 import ReactApexChart from "react-apexcharts";
-import { Card, CardBody, CardHeader, DropdownItem, DropdownMenu, DropdownToggle, UncontrolledDropdown } from "reactstrap";
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  DropdownItem,
+  DropdownMenu,
+  DropdownToggle,
+  UncontrolledDropdown,
+} from "reactstrap";
 
 const disruptionTypeColors = {
   "Airport Disruption": "#0d6efd",
@@ -38,43 +46,42 @@ const AnalyticsCharts = ({ type }) => {
   const [chartOptions, setChartOptions] = useState({});
   const [chartSeries, setChartSeries] = useState([]);
   const [timeRange, setTimeRange] = useState("total");
+  const [keywords, setKeywords] = useState([]);
 
-  const dummyActionData = {
-    dates: ["2024-12-01", "2024-12-02", "2024-12-03", "2024-12-04", "2024-12-05"],
-    counts: [20, 35, 50, 15, 40]
-  };
-
-  // Function to fetch data based on the selected time range
   useEffect(() => {
     const fetchData = async () => {
-      if (type === "actions") {
-        // Use dummy data for 'actions'
-        const categories = ["Active", "Closed"];
-        const series = categories.map(() => Math.floor(Math.random() * 100));
+      if (type === "keywordTreemap") {
+        try {
+          const response = await axios.get("/api/articles/keywords");
+          const data = response.data
 
-        setChartOptions({
-          chart: { type: "donut", height: 350 },
-          labels: categories,
-          colors: ["#28a745", "#dc3545"],
-          plotOptions: {
-            pie: {
-              donut: {
-                size: "40%",
-                labels: {
-                  name: {
-                    show: false,
-                  },
-                  show: true,
-                  value: { show: true, fontSize: "14px" },
-                },
+          const filteredData = data
+            .filter((item) => item.word && typeof item.count === "number")
+            .map(({ word, count }) => ({ x: word, y: count }))
+            .slice(0, 20);
+
+          console.log(filteredData)
+
+          setChartOptions({
+            chart: { type: "treemap", height: 350 },
+            title: {
+              text: "Top Keywords",
+              align: "center",
+              style: { fontWeight: 500 },
+            },
+            legend: { show: false },
+            plotOptions: {
+              treemap: {
+                distributed: true,
+                enableShades: false,
               },
             },
-          },
-          legend: { position: "bottom" },
-        });
+          });
 
-        setChartSeries(series);
-        return;
+          setChartSeries([{ data: filteredData }]);
+        } catch (error) {
+          console.error("Error fetching keywords:", error);
+        }
       }
 
       let endpoint = "";
@@ -97,16 +104,12 @@ const AnalyticsCharts = ({ type }) => {
         startDate = start;
         endDate = end;
       } else if (timeRange === "month") {
-        // Set correct endpoint for monthly data
         switch (type) {
           case "disruption":
             endpoint = "/api/analytics/weekly-disruption-type-counts";
             break;
           case "severity":
             endpoint = "/api/analytics/severity-level-counts";
-            break;
-          case "actions":
-            endpoint = "/api/analytics/weekly-actions";
             break;
           default:
             return;
@@ -115,16 +118,12 @@ const AnalyticsCharts = ({ type }) => {
         startDate = start;
         endDate = end;
       } else {
-        // Set correct endpoint for total data
         switch (type) {
           case "disruption":
             endpoint = "/api/analytics/disruption-type-totals";
             break;
           case "severity":
             endpoint = "/api/analytics/total-severity-counts";
-            break;
-          case "actions":
-            endpoint = "/api/analytics/actions";
             break;
           default:
             return;
@@ -133,35 +132,22 @@ const AnalyticsCharts = ({ type }) => {
 
       try {
         const response = await axios.get(endpoint, {
-          params: {
-            startDate,
-            endDate
-          }
+          params: { startDate, endDate },
         });
-        const { data } = response;
+        const data = response.data;
 
-        // Handle specific data processing based on the type
-        let series = [];
-        let categories = [];
-        if (type === "actions") {
-          const categories = ["Active", "Closed"];
-          const series = categories.map(() => Math.floor(Math.random() * 100));
-        } else {
-          const groupedData = data.reduce((acc, item) => {
-            const label = item.label || item.disruptiontype || item.severity;
-            if (!acc[label]) {
-              acc[label] = 0;
-            }
-            acc[label] += parseInt(item.total);
-            return acc;
-          }, {});
+        const groupedData = data.reduce((acc, item) => {
+          const label = item.label || item.disruptiontype || item.severity;
+          if (!acc[label]) acc[label] = 0;
+          acc[label] += parseInt(item.total, 10);
+          return acc;
+        }, {});
 
-          categories = Object.keys(groupedData);
-          series = categories.map(type => groupedData[type]);
-        }
-
-        // Map colors based on disruption types
-        const colors = categories.map((category) => disruptionTypeColors[category] || "#000000");
+        const categories = Object.keys(groupedData);
+        const series = categories.map((category) => groupedData[category]);
+        const colors = categories.map(
+          (category) => disruptionTypeColors[category] || "#000000"
+        );
 
         setChartOptions({
           chart: {
@@ -175,10 +161,7 @@ const AnalyticsCharts = ({ type }) => {
               donut: {
                 size: '40%',
                 labels: {
-                  show: true,
-                  name: {
-                    show: false,
-                  },
+                  show: false,
                   value: {
                     show: true,
                     fontSize: '14px',
@@ -198,10 +181,12 @@ const AnalyticsCharts = ({ type }) => {
             }
           },
           legend: {
-            position: "bottom",
+            show: type !== "disruption" && type !== "severity",
+          },
+          dataLabels: {
+            enabled: true,
           },
         });
-
         setChartSeries(series);
       } catch (error) {
         console.error("Error fetching chart data:", error);
@@ -215,10 +200,10 @@ const AnalyticsCharts = ({ type }) => {
     switch (type) {
       case "disruption":
         return "Disruption Types";
-      case "actions":
-        return "Actions";
       case "severity":
         return "Severity Levels";
+      case "keywordTreemap":
+        return "Top Keywords";
       default:
         return "Chart";
     }
@@ -228,72 +213,82 @@ const AnalyticsCharts = ({ type }) => {
     setTimeRange(range); // Change time range
   };
 
-  // Helper function to calculate the start and end date for the last week
   const getLastWeekDateRange = () => {
     const today = new Date();
     const dayOfWeek = today.getDay();
-
-    // Calculate previous week's Sunday
     const lastSunday = new Date(today);
-    lastSunday.setDate(today.getDate() - dayOfWeek - 7); // Move to last week's Sunday
-
-    // Calculate start of the last week (Monday)
+    lastSunday.setDate(today.getDate() - dayOfWeek - 7);
     const startOfWeek = new Date(lastSunday);
-    startOfWeek.setDate(lastSunday.getDate() - 6); // Move back 6 days to Monday
-
-    const endOfWeek = lastSunday; // End of the week (Sunday)
-
-    return { start: startOfWeek.toISOString().split("T")[0], end: endOfWeek.toISOString().split("T")[0] };
+    startOfWeek.setDate(lastSunday.getDate() - 6);
+    return {
+      start: startOfWeek.toISOString().split("T")[0],
+      end: lastSunday.toISOString().split("T")[0],
+    };
   };
 
-  // Helper function to calculate the start and end date for the last month
   const getLastMonthDateRange = () => {
     const today = new Date();
     const lastMonth = new Date(today.setMonth(today.getMonth() - 1));
     const start = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1);
     const end = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0);
-
-    return { start: start.toISOString().split("T")[0], end: end.toISOString().split("T")[0] };
+    return {
+      start: start.toISOString().split("T")[0],
+      end: end.toISOString().split("T")[0],
+    };
   };
 
-  return (
-    <div>
+  if (type === "keywordTreemap") {
+    return (
       <Card>
         <CardHeader className="d-flex align-items-center justify-content-between">
-          <h5 className="card-title mb-0">{getTitle()}</h5>
-          <UncontrolledDropdown>
-            <DropdownToggle tag="a" className="text-reset dropdown-btn">
-              <span className="fw-semibold text-uppercase fs-12">
-                Sort by:{" "}
-              </span>
-              <span className="text-muted">
-                {timeRange === "week" ? "Last Week" : timeRange === "month" ? "Last Month" : "All Time"}
-                <i className="mdi mdi-chevron-down ms-1"></i>
-              </span>
-            </DropdownToggle>
-            <DropdownMenu className="dropdown-menu-end">
-              <DropdownItem onClick={() => handleTimeRangeChange("total")}>
-                All Time
-              </DropdownItem>
-              <DropdownItem onClick={() => handleTimeRangeChange("week")}>
-                Last Week
-              </DropdownItem>
-              <DropdownItem onClick={() => handleTimeRangeChange("month")}>
-                Last Month
-              </DropdownItem>
-            </DropdownMenu>
-          </UncontrolledDropdown>
+          <h5 className="card-title mb-0">Top Keywords</h5>
         </CardHeader>
-        <CardBody>
+        <CardBody style={{ minHeight: "300px" }}>
           <ReactApexChart
-            options={chartOptions}
+            className="apex-charts"
             series={chartSeries}
-            type="donut" // Set type to "donut" or change based on type
-            height={320}
+            options={chartOptions}
+            type="treemap"
+            height="100%"
+            weight={500}
           />
         </CardBody>
       </Card>
-    </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="d-flex align-items-center justify-content-between">
+        <h5 className="card-title mb-0">{getTitle()}</h5>
+        <UncontrolledDropdown>
+          <DropdownToggle tag="a" className="text-reset dropdown-btn">
+            <span className="fw-semibold text-uppercase fs-12">Sort by: </span>
+            <span className="text-muted">
+              {timeRange === "week"
+                ? "Last Week"
+                : timeRange === "month"
+                ? "Last Month" 
+                : "All Time"}
+              <i className="mdi mdi-chevron-down ms-1"></i>
+            </span>
+          </DropdownToggle>
+          <DropdownMenu className="dropdown-menu-end">
+            <DropdownItem onClick={() => handleTimeRangeChange("total")}>All Time</DropdownItem>
+            <DropdownItem onClick={() => handleTimeRangeChange("week")}>Last Week</DropdownItem>
+            <DropdownItem onClick={() => handleTimeRangeChange("month")}>Last Month</DropdownItem>
+          </DropdownMenu>
+        </UncontrolledDropdown>
+      </CardHeader>
+      <CardBody>
+        <ReactApexChart
+          options={chartOptions}
+          series={chartSeries}
+          type="donut"
+          height={350}
+        />
+      </CardBody>
+    </Card>
   );
 };
 

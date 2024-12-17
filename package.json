@@ -34,7 +34,11 @@
     "dependencies": {
         "@tanstack/match-sorter-utils": "^8.19.4",
         "@tanstack/react-table": "^8.20.5",
+        "axios": "^1.7.9",
+        "axios-retry": "^4.5.0",
         "google-maps-react": "^2.0.6",
+        "natural": "^8.0.1",
+        "react-wordcloud": "^1.2.7",
         "reactstrap": "^9.2.3"
     }
 }

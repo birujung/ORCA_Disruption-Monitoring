@@ -9,7 +9,6 @@ import {
 import axios from "axios";
 import React, { useEffect, useState } from "react";
 import {
-  Button,
   Input,
   Pagination,
   PaginationItem,
@@ -18,7 +17,7 @@ import {
 
 const TableContainer = ({
   columns,
-  data,
+  data = [], // Data awal dari props
   isGlobalFilter = true,
   customPageSize = 10,
   SearchPlaceholder = "Search...",
@@ -27,23 +26,47 @@ const TableContainer = ({
   divClass = "table-responsive",
 }) => {
   const [globalFilter, setGlobalFilter] = useState("");
-  const [articles, setArticles] = useState(data);
+  const [articles, setArticles] = useState(data); // Data mentah dari API atau props
+  const [filteredArticles, setFilteredArticles] = useState(data); // Data yang ditampilkan di tabel
   const [loading, setLoading] = useState(false);
   const [debounceTimeout, setDebounceTimeout] = useState(null);
 
-  const fetchArticles = async (query) => {
-    setLoading(true);
-    try {
-      const response = query
-        ? await axios.get(`/api/preferences/search?query=${query}`)
-        : await axios.get("/api/articles");
-      setArticles(response.data || []);
-    } catch (error) {
-      console.error("Error fetching articles:", error);
-    } finally {
-      setLoading(false);
+  // Fetch data dari API jika `data` tidak diisi
+  useEffect(() => {
+    if (data.length === 0) {
+      const fetchArticles = async () => {
+        setLoading(true);
+        try {
+          const response = await axios.get("/api/articles");
+          setArticles(response.data || []);
+          setFilteredArticles(response.data || []); // Pastikan langsung tampil
+        } catch (error) {
+          console.error("Error fetching articles:", error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchArticles();
+    } else {
+      setArticles(data); // Jika data dari props
+      setFilteredArticles(data);
     }
-  };
+  }, [data]);
+
+  // Filter data berdasarkan input search bar
+  useEffect(() => {
+    if (globalFilter.trim() === "") {
+      setFilteredArticles(articles); // Tampilkan semua data jika input kosong
+    } else {
+      const lowerCaseFilter = globalFilter.toLowerCase();
+      const filtered = articles.filter((article) =>
+        Object.values(article).some((value) =>
+          String(value).toLowerCase().includes(lowerCaseFilter)
+        )
+      );
+      setFilteredArticles(filtered);
+    }
+  }, [globalFilter, articles]);
 
   const handleSearchChange = (e) => {
     const query = e.target.value;
@@ -54,8 +77,8 @@ const TableContainer = ({
     }
 
     const timeout = setTimeout(() => {
-      fetchArticles(query);
-    }, 500);
+      setGlobalFilter(query);
+    }, 500); // Debounce 500ms
 
     setDebounceTimeout(timeout);
   };
@@ -66,7 +89,7 @@ const TableContainer = ({
   };
 
   const table = useReactTable({
-    data: articles,
+    data: filteredArticles, // Data yang sudah difilter
     columns,
     state: { globalFilter },
     globalFilterFn: fuzzyFilter,
@@ -75,7 +98,7 @@ const TableContainer = ({
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     initialState: {
-      sorting: [{ id: "date", desc: true }], // Default sorting by date in descending order
+      sorting: [{ id: "date", desc: true }],
     },
   });
 

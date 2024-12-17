@@ -1,26 +1,23 @@
 import axios from "axios";
 import { GoogleApiWrapper, Map, Marker } from "google-maps-react";
 import moment from "moment";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { Badge, Modal, ModalBody, ModalHeader } from "reactstrap";
 import TableContainer from "./common/TableContainer";
 
-// Format tanggal ke "DD MMM YYYY"
+// Helper functions
 const formatDate = (date) =>
   moment(date, "YYYY-MM-DD HH:mm:ss").format("DD MMM YYYY");
 
-// Fungsi untuk mengambil dua kalimat pertama
 const formatDescription = (text) => {
   if (!text) return "No description available.";
-
   const sentences = text.split(".").filter((sentence) => sentence.trim() !== "");
-  const firstTwoSentences = sentences.slice(0, 2).join(". ");
-  return `${firstTwoSentences}.`;
+  return `${sentences.slice(0, 2).join(". ")}.`;
 };
 
 const mapStyles = {
-  width: '750px',
-  height: '350px',
+  width: "750px",
+  height: "350px",
 };
 
 const randomTier = () => `Tier ${Math.floor(Math.random() * 5) + 1}`;
@@ -35,49 +32,54 @@ const ArticlesTable = (props) => {
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Fetch articles on component mount
   useEffect(() => {
+    const fetchArticles = async () => {
+      setLoading(true);
+      try {
+        const response = await axios.get("/api/articles");
+        const sortedArticles = response.data.sort((a, b) =>
+          moment(b.publisheddate).diff(moment(a.publisheddate))
+        );
+        setArticles(sortedArticles);
+      } catch (error) {
+        console.error("Failed to fetch articles:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchArticles();
   }, []);
 
-  const fetchArticles = async () => {
-    setLoading(true);
-    try {
-      const response = await axios.get("/api/articles");
-      const fetchedArticles = response.data || [];
-      console.log("Fetched articles:", fetchedArticles);
-
-      // Sort articles by publish date in descending order (latest first)
-      const sortedArticles = fetchedArticles.sort((a, b) =>
-        moment(a.publisheddate).isBefore(moment(b.publisheddate)) ? 1 : -1
-      );
-      
-      console.log("Sorted articles:", sortedArticles);
-      setArticles(sortedArticles);
-    } catch (error) {
-      console.error("Failed to fetch articles:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const fetchArticleById = async (id) => {
-    console.log("Fetching article with ID:", id); // Debugging log
+    let isMounted = true; // Tambahkan flag untuk komponen ini
     try {
       const response = await axios.get(`/api/articles/${id}`);
-      console.log(response.data); // Check if data is returned
-      setSelectedArticle(response.data);
-      setIsModalOpen(true);
+      if (isMounted) {
+        setSelectedArticle(response.data);
+        setIsModalOpen(true);
+      }
     } catch (error) {
       console.error("Failed to fetch article by ID:", error);
     }
-  };
+  
+    // Cleanup
+    return () => {
+      isMounted = false;
+    };
+  };  
 
   const handleScrapeArticles = async () => {
     setIsScraping(true);
     try {
       await axios.post("/api/articles/scrape");
-      await fetchArticles();
-    } catch (error)      {
+      const response = await axios.get("/api/articles");
+      const sortedArticles = response.data.sort((a, b) =>
+        moment(b.publisheddate).diff(moment(a.publisheddate))
+      );
+      setArticles(sortedArticles);
+    } catch (error) {
       console.error("Failed to scrape articles:", error);
     } finally {
       setIsScraping(false);
@@ -94,12 +96,11 @@ const ArticlesTable = (props) => {
       {
         header: "Title",
         accessorKey: "title",
-        filterFn: "fuzzy",
         cell: (info) => (
           <div
             className="fw-bold text-primary text-wrap"
             style={{ cursor: "pointer" }}
-            onClick={() => fetchArticleById(info.row.original.id)} // Open modal on title click
+            onClick={() => fetchArticleById(info.row.original.id)}
           >
             {info.getValue()}
           </div>
@@ -108,7 +109,6 @@ const ArticlesTable = (props) => {
       {
         header: "Description",
         accessorKey: "text",
-        filterFn: "fuzzy",
         cell: (info) => (
           <div className="text-wrap">{formatDescription(info.getValue())}</div>
         ),
@@ -116,25 +116,21 @@ const ArticlesTable = (props) => {
       {
         header: "Disruption Type",
         accessorKey: "disruptiontype",
-        filterFn: "fuzzy",
         cell: (info) => <span>{info.getValue()}</span>,
       },
       {
         header: "Country Impacted",
         accessorKey: "location",
-        filterFn: "fuzzy",
         cell: (info) => <span>{info.getValue() || "Unknown"}</span>,
       },
       {
         header: "Tiers Impacted",
         accessorKey: "tier",
-        filterFn: "fuzzy",
         cell: () => <span>{randomTier()}</span>,
       },
       {
         header: "Severity",
         accessorKey: "severity",
-        filterFn: "fuzzy",
         cell: (info) => {
           const severity = info.getValue();
           const badgeColor =
@@ -149,7 +145,6 @@ const ArticlesTable = (props) => {
       {
         header: "Actions",
         accessorKey: "action",
-        filterFn: "fuzzy",
         cell: () => (
           <span className="text-underline" style={{ cursor: "pointer" }}>
             {randomAction()}
@@ -217,17 +212,19 @@ const ArticlesTable = (props) => {
               style={mapStyles}
               zoom={6}
               initialCenter={{
-                lat: selectedArticle?.lat || selectedArticle?.location?.lat || defaultLocation.lat,
-                lng: selectedArticle?.lng || selectedArticle?.location?.lng || defaultLocation.lng,
+                lat: selectedArticle?.lat || defaultLocation.lat,
+                lng: selectedArticle?.lng || defaultLocation.lng,
               }}
             >
               <Marker
                 position={{
-                  lat: selectedArticle?.lat || selectedArticle?.location?.lat || defaultLocation.lat,
-                  lng: selectedArticle?.lng || selectedArticle?.location?.lng || defaultLocation.lng,
+                  lat: selectedArticle?.lat || defaultLocation.lat,
+                  lng: selectedArticle?.lng || defaultLocation.lng,
                 }}
                 icon={{
-                  url: `http://maps.google.com/mapfiles/ms/icons/${getSeverityColor(selectedArticle?.severity)}-dot.png`,
+                  url: `http://maps.google.com/mapfiles/ms/icons/${getSeverityColor(
+                    selectedArticle?.severity
+                  )}-dot.png`,
                 }}
               />
             </Map>
