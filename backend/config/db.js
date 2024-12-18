@@ -1,22 +1,24 @@
-const { Pool } = require('pg');
+const { MongoClient } = require("mongodb");
+require("dotenv").config();
 
-const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASS,  // Double-check this
-  port: 5432, 
-  ssl: {
-    rejectUnauthorized: false,
-  },
-});
+const client = new MongoClient(process.env.MONGO_URI);
 
-pool.connect((err) => {
-  if (err) {
-    console.error('Error connecting to the database:', err.stack);
-  } else {
-    console.log('Connected to the database successfully.');
+let db;
+
+const connectDB = async () => {
+  try {
+    await client.connect();
+    db = client.db(process.env.DATABASE_NAME);
+    console.log("MongoDB connected successfully");
+  } catch (error) {
+    console.error("MongoDB connection error:", error.message);
+    process.exit(1);
   }
-});
+};
 
-module.exports = pool;
+const getDB = () => {
+  if (!db) throw new Error("Database not initialized");
+  return db;
+};
+
+module.exports = { connectDB, getDB };

@@ -42,6 +42,12 @@ const disruptionTypeColors = {
   "Unknown": "#f57c00",
 };
 
+const severityColors = {
+  High: "#dc3545",   // Merah
+  Medium: "#ffc107", // Kuning
+  Low: "#28a745",    // Hijau
+};
+
 const AnalyticsCharts = ({ type }) => {
   const [chartOptions, setChartOptions] = useState({});
   const [chartSeries, setChartSeries] = useState([]);
@@ -85,38 +91,35 @@ const AnalyticsCharts = ({ type }) => {
       }
 
       let endpoint = "";
-      let startDate = "";
-      let endDate = "";
+      let queryParams = {};
 
       if (timeRange === "week") {
         // Set correct endpoint for weekly data
         switch (type) {
           case "disruption":
             endpoint = "/api/analytics/weekly-disruption-type-counts";
+            queryParams = { range: "lastweek" };
             break;
           case "severity":
             endpoint = "/api/analytics/severity-level-counts";
+            queryParams = { range: "lastweek" };
             break;
           default:
             return;
         }
-        const { start, end } = getLastWeekDateRange(); // Get last week date range
-        startDate = start;
-        endDate = end;
       } else if (timeRange === "month") {
         switch (type) {
           case "disruption":
             endpoint = "/api/analytics/weekly-disruption-type-counts";
+            queryParams = { range: "lastmonth" };
             break;
           case "severity":
             endpoint = "/api/analytics/severity-level-counts";
+            queryParams = { range: "lastmonth" };
             break;
           default:
             return;
         }
-        const { start, end } = getLastMonthDateRange(); // Get last month date range
-        startDate = start;
-        endDate = end;
       } else {
         switch (type) {
           case "disruption":
@@ -131,17 +134,15 @@ const AnalyticsCharts = ({ type }) => {
       }
 
       try {
-        const response = await axios.get(endpoint, {
-          params: { startDate, endDate },
-        });
+        const response = await axios.get(endpoint, { params: queryParams });
         const data = response.data;
 
         const groupedData = data.reduce((acc, item) => {
-          const label = item.label || item.disruptiontype || item.severity;
+          const label = item.disruptionType || item.severity || "Unknown"; // Properti benar
           if (!acc[label]) acc[label] = 0;
           acc[label] += parseInt(item.total, 10);
           return acc;
-        }, {});
+        }, {});        
 
         const categories = Object.keys(groupedData);
         const series = categories.map((category) => groupedData[category]);
@@ -155,7 +156,10 @@ const AnalyticsCharts = ({ type }) => {
             height: 350,
           },
           labels: categories,
-          colors: type === "severity" ? ["#dc3545", "#ffc107", "#28a745"] : colors,
+          colors:
+            type === "severity"
+              ? categories.map((category) => severityColors[category] || "#000000")
+              : colors,
           plotOptions: {
             pie: {
               donut: {

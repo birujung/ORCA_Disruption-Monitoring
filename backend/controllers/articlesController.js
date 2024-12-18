@@ -1,4 +1,5 @@
-const pool = require("../config/db.js");
+const { getDB } = require("../config/db.js");
+const { ObjectId } = require("mongodb");
 require("dotenv").config();
 const OpenAI = require("openai");
 const NewsAPI = require("newsapi");
@@ -9,6 +10,35 @@ const natural = require("natural");
 
 const CHINA_LAT = 35.8617;
 const CHINA_LNG = 104.1954;
+
+const categoriesList = [
+  "Airport Disruption",
+  "Bankruptcy",
+  "Business Spin-Off",
+  "Business Sale",
+  "Chemical Spill",
+  "Corruption",
+  "Company Split",
+  "Cyber Attack",
+  "FDA/EMA/OSHA Action",
+  "Factory Fire",
+  "Geopolitical",
+  "Leadership Transition",
+  "Legal Action",
+  "Merger & Acquisition",
+  "Port Disruption",
+  "Protest/Riot",
+  "Supply Shortage",
+  "Earthquake",
+  "Extreme Weather",
+  "Flood",
+  "Hurricane",
+  "Tornado",
+  "Volcano",
+  "Human Health",
+  "Power Outage",
+  "CNA"
+];
 
 // Utility function to calculate distance between two points using Haversine formula
 const calculateRadius = (lat1, lng1, lat2, lng2) => {
@@ -56,53 +86,55 @@ const getLatLngFromLocation = async (location) => {
   }
 };
 
-//Utility function to get disruption types from database
-const getCategoriesForPrompt = async () => {
-  const categories = await pool.query(
-    'SELECT category_name FROM disruption_categories WHERE isdeleted = FALSE'
-  );
-
-  return categories.rows.map(cat => `'${cat.category_name}'`).join(', ');
-};
-
 // [FUNCTIONAL] Function to process keyword frequencies
 const getKeywordCloud = async (req, res) => {
   try {
-    // Fetch URLs from the database
-    const result = await pool.query(
-      "SELECT url FROM articles WHERE isdeleted = false AND url IS NOT NULL"
-    );
+    const db = getDB();
+    const collection = db.collection(process.env.COLLECTION_NAME);
 
-    if (result.rows.length === 0) {
+    // Ambil semua URL dari artikel
+    const articles = await collection
+      .find({ isdeleted: { $ne: true }, url: { $ne: null } })
+      .toArray();
+
+    if (articles.length === 0) {
       return res.status(404).json({ message: "No articles found." });
     }
 
     const tokenizer = new natural.WordTokenizer();
     const stopWords = [
-      "the", "and", "is", "to", "a", "of", "in", "on", "at", "by", "for", "with", 
-      "as", "from", "this", "that", "it", "are", "was", "be", "or", "an", "but", 
-      "not", "if", "so", "we", "you", "he", "she", "they", "them", "then"
+      "the", "and", "is", "to", "a", "of", "in", "on", "at", "by", "for", "with",
+      "as", "from", "this", "that", "it", "are", "was", "be", "or", "an", "but",
+      "not", "if", "so", "we", "you", "he", "she", "they", "them", "then", "&nbsp;"
     ];
+
+    const sanitizeText = (text) => {
+      return text
+        .replace(/&nbsp;/g, " ")      // Ganti &nbsp; dengan spasi
+        .replace(/[^\w\s]/g, "")      // Hapus karakter non-alphanumeric kecuali spasi
+        .replace(/\s+/g, " ")         // Hapus spasi berlebih
+        .trim();
+    };
 
     const wordFrequency = {};
 
-    // Fetch content from each URL and tokenize it
-    for (const row of result.rows) {
+    // Tokenisasi kata dari konten setiap artikel
+    for (const article of articles) {
       try {
-        const response = await axios.get(row.url);
+        const response = await axios.get(article.url);
         const htmlContent = response.data;
 
-        // Extract text from the HTML (requires a library or custom logic)
-        const textContent = extractTextFromHTML(htmlContent); // Implement this function
-
+        // Bersihkan teks sebelum tokenisasi
+        const textContent = sanitizeText(extractTextFromHTML(htmlContent));
         const words = tokenizer.tokenize(textContent.toLowerCase());
+
         words.forEach((word) => {
           if (!stopWords.includes(word) && word.length > 2) {
             wordFrequency[word] = (wordFrequency[word] || 0) + 1;
           }
         });
       } catch (error) {
-        console.warn(`Error fetching content from URL ${row.url}: ${error.message}`);
+        console.warn(`Error fetching content from URL ${article.url}: ${error.message}`);
       }
     }
 
@@ -115,7 +147,7 @@ const getKeywordCloud = async (req, res) => {
     console.error("Error generating keyword cloud:", error.message);
     res.status(500).json({ message: "Error generating keyword cloud." });
   }
-};
+}; 
 
 // Helper function to extract text from HTML
 const extractTextFromHTML = (html) => {
@@ -177,16 +209,10 @@ const detectCountryFallback = (text) => {
 
 // [FUNCTIONAL] Function to check if an article already exists in the database
 const checkArticleExists = async (url) => {
-  try {
-    const result = await pool.query(
-      "SELECT id FROM articles WHERE url = $1 AND isdeleted = false",
-      [url]
-    );
-    return result.rowCount > 0; // Return true if article exists
-  } catch (error) {
-    console.error("Error checking article existence:", error.message);
-    return false;
-  }
+  const db = getDB();
+  const collection = db.collection(process.env.COLLECTION_NAME);
+  const article = await collection.findOne({ url });
+  return !!article; // Return true jika artikel ditemukan
 };
 
 // [FUNCTIONAL] Function to detect severity and location using OpenAI GPT-4o-Mini
@@ -199,7 +225,7 @@ const detectSeverityAndLocation = async (text) => {
                   2. Identify the primary country affected by the disruption. 
                      - If multiple countries are mentioned, select the one that is most frequently referenced. 
                      - If no clear country is specified, try to infer the location from contextual clues, but never respond with "Unknown" as the location.
-                  Format the response EXACTLY as: "Severity: <Low/Medium/High>, Location: <Country Name>".`;
+                  Format the response EXACTLY as: "Severity: <Low/Medium/High>, Location: <Country Name>". No further explanation needed.`;
 
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
@@ -232,11 +258,12 @@ const detectSeverityAndLocation = async (text) => {
 
 // [FUNCTIONAL] Function to detect disruption type using OpenAI GPT-4o-Mini
 const detectDisruptionType = async (text) => {
-  const categoriesList = await getCategoriesForPrompt();
-  const prompt = `Based on the following information about an article: ${text}
+  const formattedCategories = categoriesList.map(cat => `'${cat}'`).join(", "); // Format kategori
+
+  const prompt = `Based on the following information about an article: "${text}"
                   
                   Classify the disruption described in this article into one of these categories:
-                  ${categoriesList}
+                  ${formattedCategories}
 
                   Select only one category from the list above that best fits the type of disruption. Do not provide any additional text or explanation, just respond with the single category name.`;
 
@@ -253,7 +280,7 @@ const detectDisruptionType = async (text) => {
     return completion.choices[0]?.message?.content?.trim() || "Unknown";
   } catch (error) {
     console.error("Error in detectDisruptionType:", error.message);
-    return "Unknown"; // Return a default value if API fails
+    return "Unknown"; // Default value jika API gagal
   }
 };
 
@@ -280,42 +307,29 @@ const summarizeArticle = async (text) => {
 
 // [FUNCTIONAL] Function to save articles to the database (batch insertion)
 const saveArticlesToDatabase = async (articles) => {
-  const query = `
-      INSERT INTO articles (title, text, raw_text, disruptiontype, severity, sourcename, publisheddate, url, imageurl, created_at, location, lat, lng, radius, isdeleted)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-      RETURNING id;
-      `;
-
-  const promises = articles.map((article) => {
-    const values = [
-      article.title,
-      article.text,
-      article.raw_text,
-      article.disruptionType,
-      article.severity,
-      article.sourceName,
-      article.publishedDate,
-      article.url,
-      article.imageUrl,
-      new Date(),
-      article.location,
-      article.lat || 0.0,
-      article.lng || 0.0,
-      article.radius || 0,
-      article.isDeleted || false,
-    ];
-
-    return pool.query(query, values);
-  });
-
   try {
-    const results = await Promise.all(promises);
-    results.forEach((result) => {
-      const insertedId = result.rows[0].id;
-      console.log(`Article saved to database with ID: ${insertedId}.`);
-    });
+    const db = getDB();
+    const collection = db.collection(process.env.COLLECTION_NAME);
+
+    for (const article of articles) {
+      // Cek apakah artikel sudah dihapus sebelumnya
+      const existingArticle = await collection.findOne({ url: article.url });
+      if (existingArticle && existingArticle.isdeleted) {
+        console.log(`Skipping deleted article: ${article.url}`);
+        continue; // Lewati artikel yang sudah ditandai isdeleted
+      }
+
+      // Simpan atau update artikel jika tidak dihapus
+      await collection.updateOne(
+        { url: article.url },
+        { $set: article },
+        { upsert: true }
+      );
+    }
+
+    console.log(`${articles.length} articles processed successfully.`);
   } catch (error) {
-    console.error("Error saving articles to the database:", error.message);
+    console.error("Error saving articles to MongoDB:", error.message);
   }
 };
 
@@ -345,52 +359,44 @@ const scrapeAndSaveArticles = async (req, res) => {
     if (response.status === "ok" && response.articles.length > 0) {
       const articlesToSave = [];
 
-      const userLat = req.body.userLat || CHINA_LAT;
-      const userLng = req.body.userLng || CHINA_LNG;
-
       for (const article of response.articles) {
-        const text = article.content || article.description || article.title || "No Content Available";
-
-        try {
-          const urlCheckResponse = await axios.get(article.url);
-          if (urlCheckResponse.status !== 200) continue;
-        } catch {
-          continue;
-        }
-
         const articleExists = await checkArticleExists(article.url);
-        if (articleExists) continue;
+        if (articleExists) continue; // Skip jika sudah ada
 
+        const text = article.content || article.description || article.title || "No Content Available";
         const disruptionType = await detectDisruptionType(text);
+
         if (disruptionType === "Unknown") continue;
 
+        // Deteksi lokasi dan severity
         const { severity, location } = await detectSeverityAndLocation(text);
-        const finalLocation = location || detectCountryFallback(text);
-        const { lat, lng } = await getLatLngFromLocation(finalLocation);
-        const radius = lat && lng ? Math.round(calculateRadius(userLat, userLng, lat, lng)) : null;
-        const summarizedText = await summarizeArticle(text);
+        const { lat, lng } = await getLatLngFromLocation(location);
+
+        // Hitung radius dari lokasi default (contoh: China Lat/Lng) jika lat/lng tersedia
+        const radius = lat && lng ? calculateRadius(lat, lng, CHINA_LAT, CHINA_LNG) : null;
 
         const articleData = {
           title: article.title || "No Title",
-          text: summarizedText,
-          raw_text: text,
-          location: finalLocation,
           disruptionType: disruptionType,
-          severity: severity,
-          sourceName: article.source.name || "Unknown",
-          publishedDate: article.publishedAt || new Date(),
           url: article.url,
           imageUrl: article.urlToImage || "No Image",
-          lat: lat,
-          lng: lng,
-          radius: radius,
+          publishedDate: article.publishedAt || new Date().toISOString(),
+          raw_text: text,
+          text: await summarizeArticle(text),
+          location: location,
+          lat: lat || null,
+          lng: lng || null,
+          radius: radius || null,
+          severity: severity || "Low",
+          isdeleted: false,
         };
 
         articlesToSave.push(articleData);
+        console.log(`Prepared article: ${article.title}`);
       }
 
       await saveArticlesToDatabase(articlesToSave);
-      res.status(200).json({ message: "Articles scraped and saved successfully.", total: articlesToSave.length });
+      res.status(200).json({ message: "Articles processed successfully.", total: articlesToSave.length });
     } else {
       res.status(400).json({ message: "No articles found for the given date range." });
     }
@@ -400,17 +406,17 @@ const scrapeAndSaveArticles = async (req, res) => {
   }
 };
 
-
 // [FUNCTIONAL] Function to get all articles from the database
 const getAllArticles = async (req, res) => {
   try {
-    const result = await pool.query(
-      "SELECT * FROM articles WHERE isdeleted = false ORDER BY created_at DESC"
-    );
-    res.status(200).json(result.rows);
+    const db = getDB();
+    const collection = db.collection(process.env.COLLECTION_NAME);
+
+    const articles = await collection.find({ isdeleted: { $ne: true } }).toArray();
+    res.status(200).json(articles);
   } catch (error) {
-    console.error("Error getting articles:", error.message);
-    res.status(500).json({ message: "Error getting articles." });
+    console.error("Error fetching articles:", error.message);
+    res.status(500).json({ message: "Error fetching articles." });
   }
 };
 
@@ -419,25 +425,18 @@ const getFilteredArticles = async (req, res) => {
   const disruptionType = req.query.disruptionType;
 
   try {
-    let query;
-    let values = [];
+    const db = getDB();
+    const collection = db.collection(process.env.COLLECTION_NAME);
 
-    // If disruptionType is provided, filter by it
-    if (disruptionType) {
-      query =
-        "SELECT * FROM articles WHERE disruptiontype = $1 AND isdeleted = false ORDER BY created_at DESC";
-      values = [disruptionType];
-    } else {
-      // If no filtering, just get all articles
-      query =
-        "SELECT * FROM articles WHERE isdeleted = false ORDER BY created_at DESC";
-    }
+    const query = disruptionType
+      ? { disruptionType, isdeleted: { $ne: true } }
+      : { isdeleted: { $ne: true } };
 
-    const result = await pool.query(query, values);
-    res.status(200).json(result.rows);
+    const articles = await collection.find(query).toArray();
+    res.status(200).json(articles);
   } catch (error) {
-    console.error("Error getting articles:", error.message);
-    res.status(500).json({ message: "Error getting articles." });
+    console.error("Error fetching articles:", error.message);
+    res.status(500).json({ message: "Error fetching articles." });
   }
 };
 
@@ -446,13 +445,17 @@ const getArticleById = async (req, res) => {
   const articleId = req.params.id;
 
   try {
-    const result = await pool.query(
-      "SELECT * FROM articles WHERE id = $1 AND isdeleted = false",
-      [articleId]
-    );
+    const db = getDB(); // Ambil instance database
+    const collection = db.collection(process.env.COLLECTION_NAME);
 
-    if (result.rows.length > 0) {
-      res.status(200).json(result.rows[0]);
+    // Cari artikel berdasarkan ObjectId dan pastikan belum dihapus
+    const article = await collection.findOne({
+      _id: new ObjectId(articleId), // Konversi ID ke ObjectId
+      isdeleted: { $ne: true },    // Filter untuk artikel yang belum dihapus
+    });
+
+    if (article) {
+      res.status(200).json(article);
     } else {
       res.status(404).json({ message: "Article not found." });
     }
@@ -467,20 +470,43 @@ const deleteArticle = async (req, res) => {
   const articleId = req.params.id;
 
   try {
-    const result = await pool.query(
-      "UPDATE articles SET isdeleted = true WHERE id = $1",
-      [articleId]
+    const db = getDB();
+    const collection = db.collection(process.env.COLLECTION_NAME);
+
+    // Pastikan ObjectId dibuat dengan benar
+    const result = await collection.updateOne(
+      { _id: new ObjectId(articleId) },
+      { $set: { isdeleted: true } }
     );
-    if (result.rowCount > 0) {
-      res
-        .status(200)
-        .json({ message: `Article ${articleId} deleted successfully.` });
+
+    if (result.modifiedCount > 0) {
+      res.status(200).json({ message: `Article ${articleId} deleted successfully.` });
     } else {
       res.status(404).json({ message: "Article not found." });
     }
   } catch (error) {
     console.error("Error deleting article:", error.message);
     res.status(500).json({ message: "Error deleting article." });
+  }
+};
+
+// Function to delete all articles (development purposes)
+const deleteAllArticles = async (req, res) => {
+  try {
+    const db = getDB();
+    const collection = db.collection(process.env.COLLECTION_NAME);
+
+    // Hapus semua artikel dengan filter kosong {}
+    const result = await collection.deleteMany({});
+    console.log(`${result.deletedCount} articles deleted successfully.`);
+
+    res.status(200).json({
+      message: "All articles have been deleted successfully.",
+      deletedCount: result.deletedCount,
+    });
+  } catch (error) {
+    console.error("Error deleting all articles:", error.message);
+    res.status(500).json({ message: "Error deleting all articles." });
   }
 };
 
@@ -491,4 +517,5 @@ module.exports = {
   getArticleById,
   getKeywordCloud,
   deleteArticle,
+  deleteAllArticles
 };

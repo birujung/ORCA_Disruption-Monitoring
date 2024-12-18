@@ -1,13 +1,15 @@
 import axios from "axios";
 import { GoogleApiWrapper, Map, Marker } from "google-maps-react";
 import moment from "moment";
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Badge, Modal, ModalBody, ModalHeader } from "reactstrap";
 import TableContainer from "./common/TableContainer";
 
 // Helper functions
-const formatDate = (date) =>
-  moment(date, "YYYY-MM-DD HH:mm:ss").format("DD MMM YYYY");
+const formatDate = (date) => {
+  if (!date) return "Unknown";
+  return moment(date).format("DD MMM YYYY"); // Tangani ISO date format
+};
 
 const formatDescription = (text) => {
   if (!text) return "No description available.";
@@ -39,7 +41,7 @@ const ArticlesTable = (props) => {
       try {
         const response = await axios.get("/api/articles");
         const sortedArticles = response.data.sort((a, b) =>
-          moment(b.publisheddate).diff(moment(a.publisheddate))
+          moment(b.publishedDate).diff(moment(a.publishedDate)) // Perbaiki publishedDate
         );
         setArticles(sortedArticles);
       } catch (error) {
@@ -48,26 +50,18 @@ const ArticlesTable = (props) => {
         setLoading(false);
       }
     };
-
+  
     fetchArticles();
   }, []);
-
+  
   const fetchArticleById = async (id) => {
-    let isMounted = true; // Tambahkan flag untuk komponen ini
     try {
       const response = await axios.get(`/api/articles/${id}`);
-      if (isMounted) {
-        setSelectedArticle(response.data);
-        setIsModalOpen(true);
-      }
+      setSelectedArticle(response.data);
+      setIsModalOpen(true);
     } catch (error) {
       console.error("Failed to fetch article by ID:", error);
     }
-  
-    // Cleanup
-    return () => {
-      isMounted = false;
-    };
   };  
 
   const handleScrapeArticles = async () => {
@@ -76,7 +70,7 @@ const ArticlesTable = (props) => {
       await axios.post("/api/articles/scrape");
       const response = await axios.get("/api/articles");
       const sortedArticles = response.data.sort((a, b) =>
-        moment(b.publisheddate).diff(moment(a.publisheddate))
+        moment(b.publishedDate).diff(moment(a.publishedDate))
       );
       setArticles(sortedArticles);
     } catch (error) {
@@ -90,7 +84,7 @@ const ArticlesTable = (props) => {
     () => [
       {
         header: "Date",
-        accessorKey: "publisheddate",
+        accessorKey: "publishedDate", // Properti MongoDB
         cell: (info) => <span>{formatDate(info.getValue())}</span>,
       },
       {
@@ -100,7 +94,7 @@ const ArticlesTable = (props) => {
           <div
             className="fw-bold text-primary text-wrap"
             style={{ cursor: "pointer" }}
-            onClick={() => fetchArticleById(info.row.original.id)}
+            onClick={() => fetchArticleById(info.row.original._id)} // Gunakan _id dari MongoDB
           >
             {info.getValue()}
           </div>
@@ -115,7 +109,7 @@ const ArticlesTable = (props) => {
       },
       {
         header: "Disruption Type",
-        accessorKey: "disruptiontype",
+        accessorKey: "disruptionType", // Properti MongoDB
         cell: (info) => <span>{info.getValue()}</span>,
       },
       {
@@ -194,7 +188,7 @@ const ArticlesTable = (props) => {
         </ModalHeader>
         <ModalBody>
           <div>
-            <p><strong>Published Date:</strong> {formatDate(selectedArticle?.publisheddate)}</p>
+            <p><strong>Published Date:</strong> {formatDate(selectedArticle?.publishedDate)}</p>
             <p><strong>Location:</strong> {selectedArticle?.location}</p>
             <p><strong>Disruption Type:</strong> {selectedArticle?.disruptiontype}</p>
             <p><strong>Severity:</strong> 
@@ -203,6 +197,21 @@ const ArticlesTable = (props) => {
               </Badge>
             </p>
             <p><strong>Description:</strong> {selectedArticle?.text}</p>
+            <p>
+              <strong>Source:</strong>{" "}
+              {selectedArticle?.url ? (
+                <a
+                  href={selectedArticle.url}
+                  target="_blank" // Buka URL di tab baru
+                  rel="noopener noreferrer" // Keamanan tambahan
+                  style={{ color: "#007bff", textDecoration: "underline", cursor: "pointer" }}
+                >
+                  {selectedArticle.url}
+                </a>
+              ) : (
+                "No source available"
+              )}
+            </p>
           </div>
 
           {/* Google Map */}
