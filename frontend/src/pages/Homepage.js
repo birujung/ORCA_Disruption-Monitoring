@@ -1,3 +1,18 @@
+/**
+ * Homepage Component
+ * 
+ * This component serves as the main page of the application. It integrates analytics visualizations 
+ * and a table of articles into a cohesive dashboard layout.
+ * 
+ * Features:
+ * - Displays analytics charts for disruption types, severity levels, and keyword frequencies.
+ * - Includes an interactive table for viewing and managing articles.
+ * 
+ * Dependencies:
+ * - `reactstrap`: For UI components such as `Container`, `Row`, `Col`, and `Card`.
+ * - `AnalyticsCharts`: Component for rendering various analytics visualizations.
+ * - `ArticlesTable`: Component for displaying and interacting with article data.
+ */
 import React from "react";
 import { Card, Col, Container, Row } from "reactstrap";
 import AnalyticsCharts from "../components/AnalyticsCharts";

@@ -1,3 +1,28 @@
+/**
+ * TableContainer Component
+ * 
+ * This component provides a highly customizable, paginated, sortable, and searchable table 
+ * built with `@tanstack/react-table` and styled using Reactstrap.
+ * 
+ * - Supports fetching data dynamically via API or using data passed as props.
+ * - Includes debounced global search functionality for filtering table data.
+ * - Enables column-level sorting and pagination with page size control.
+ * 
+ * Dependencies:
+ * - `@tanstack/react-table`: For advanced table features such as sorting, filtering, and pagination.
+ * - `axios`: For making API requests.
+ * - `reactstrap`: For UI components such as `Input` and `Pagination`.
+ * 
+ * Props:
+ * - `columns`: Array of column definitions for the table.
+ * - `data`: (Optional) Array of initial data to populate the table. If not provided, data will be fetched from the `/api/articles` endpoint.
+ * - `isGlobalFilter`: (Optional) Boolean to enable or disable global search functionality. Default is `true`.
+ * - `customPageSize`: (Optional) Number of rows per page. Default is `10`.
+ * - `SearchPlaceholder`: (Optional) Placeholder text for the search input. Default is `"Search..."`.
+ * - `tableClass`: (Optional) CSS class for the table element. Default is `"table align-middle table-nowrap"`.
+ * - `theadClass`: (Optional) CSS class for the table header. Default is `"table-light"`.
+ * - `divClass`: (Optional) CSS class for the table wrapper. Default is `"table-responsive"`.
+ */
 import { rankItem } from "@tanstack/match-sorter-utils";
 import {
   flexRender,
@@ -25,13 +50,16 @@ const TableContainer = ({
   theadClass = "table-light",
   divClass = "table-responsive",
 }) => {
+  // State variables
   const [globalFilter, setGlobalFilter] = useState("");
-  const [articles, setArticles] = useState(data); // Data mentah dari API atau props
-  const [filteredArticles, setFilteredArticles] = useState(data); // Data yang ditampilkan di tabel
+  const [articles, setArticles] = useState(data);
+  const [filteredArticles, setFilteredArticles] = useState(data);
   const [loading, setLoading] = useState(false);
   const [debounceTimeout, setDebounceTimeout] = useState(null);
 
-  // Fetch data dari API jika `data` tidak diisi
+  /**
+   * Fetch articles data if `data` prop is not provided.
+   */
   useEffect(() => {
     if (data.length === 0) {
       const fetchArticles = async () => {
@@ -39,7 +67,7 @@ const TableContainer = ({
         try {
           const response = await axios.get("/api/articles");
           setArticles(response.data || []);
-          setFilteredArticles(response.data || []); // Pastikan langsung tampil
+          setFilteredArticles(response.data || []);
         } catch (error) {
           console.error("Error fetching articles:", error);
         } finally {
@@ -48,15 +76,17 @@ const TableContainer = ({
       };
       fetchArticles();
     } else {
-      setArticles(data); // Jika data dari props
+      setArticles(data);
       setFilteredArticles(data);
     }
   }, [data]);
 
-  // Filter data berdasarkan input search bar
+  /**
+   * Filter articles based on global search input.
+   */
   useEffect(() => {
     if (globalFilter.trim() === "") {
-      setFilteredArticles(articles); // Tampilkan semua data jika input kosong
+      setFilteredArticles(articles);
     } else {
       const lowerCaseFilter = globalFilter.toLowerCase();
       const filtered = articles.filter((article) =>
@@ -68,6 +98,9 @@ const TableContainer = ({
     }
   }, [globalFilter, articles]);
 
+  /**
+   * Handle search input changes with a 500ms debounce.
+   */
   const handleSearchChange = (e) => {
     const query = e.target.value;
     setGlobalFilter(query);
@@ -83,13 +116,18 @@ const TableContainer = ({
     setDebounceTimeout(timeout);
   };
 
+  /**
+   * Custom fuzzy filtering for global search.
+   */
+
   const fuzzyFilter = (row, columnId, value) => {
     const itemRank = rankItem(row.getValue(columnId), value);
     return itemRank.passed;
   };
 
+  // Initialize the table instance
   const table = useReactTable({
-    data: filteredArticles, // Data yang sudah difilter
+    data: filteredArticles,
     columns,
     state: { globalFilter },
     globalFilterFn: fuzzyFilter,
@@ -102,10 +140,16 @@ const TableContainer = ({
     },
   });
 
+  /**
+   * Update the page size whenever `customPageSize` prop changes.
+   */
   useEffect(() => {
     table.setPageSize(customPageSize);
   }, [customPageSize, table]);
 
+  /**
+   * Generate pagination buttons.
+   */
   const getPageNumbers = () => {
     const totalPages = table.getPageCount();
     const currentPage = table.getState().pagination.pageIndex;

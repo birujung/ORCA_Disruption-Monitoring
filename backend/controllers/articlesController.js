@@ -1,3 +1,19 @@
+/**
+ * Article Management and Analysis Module
+ * 
+ * This module provides a suite of functionalities to scrape, analyze, and manage articles 
+ * related to disruptions. It integrates with third-party services (OpenAI, NewsAPI, 
+ * Google Geocoding) and uses MongoDB as the database backend.
+ * 
+ * Dependencies:
+ * - MongoDB for storing and querying articles.
+ * - OpenAI for disruption type, severity, location detection, and article summarization.
+ * - NewsAPI for fetching articles.
+ * - Google Geocoding API for obtaining geographic coordinates.
+ * - Natural.js for natural language processing.
+ */
+
+// Import required libraries and utilities
 const { getDB } = require("../config/db.js");
 const { ObjectId } = require("mongodb");
 require("dotenv").config();
@@ -8,9 +24,11 @@ const openai = new OpenAI(process.env.OPENAI_API_KEY);
 const axios = require("axios");
 const natural = require("natural");
 
+// Constants (Can change later based on specific supplier for use case)
 const CHINA_LAT = 35.8617;
 const CHINA_LNG = 104.1954;
 
+// List of predefined disruption categories (Can change later to be dynamic)
 const categoriesList = [
   "Airport Disruption",
   "Bankruptcy",
@@ -40,7 +58,16 @@ const categoriesList = [
   "CNA"
 ];
 
-// Utility function to calculate distance between two points using Haversine formula
+// Utility Functions
+/**
+ * Calculate the distance between two geographic coordinates using the Haversine formula.
+ * 
+ * @param {number} lat1 Latitude of point 1
+ * @param {number} lng1 Longitude of point 1
+ * @param {number} lat2 Latitude of point 2
+ * @param {number} lng2 Longitude of point 2
+ * @returns {number} Distance between the two points in kilometers
+ */
 const calculateRadius = (lat1, lng1, lat2, lng2) => {
   const R = 6371; // Radius of the earth in km
   const dLat = (lat2 - lat1) * (Math.PI / 180);
@@ -55,7 +82,12 @@ const calculateRadius = (lat1, lng1, lat2, lng2) => {
   return R * c; // Distance in km
 };
 
-// Utility function to get latitude and longitude using Google Geocoding API
+/**
+ * Get geographic coordinates (latitude and longitude) for a location using Google Geocoding API.
+ * 
+ * @param {string} location Name of the location
+ * @returns {Object} An object containing latitude (`lat`) and longitude (`lng`)
+ */
 const getLatLngFromLocation = async (location) => {
   if (!location || location === "Unknown") {
     return { lat: null, lng: null };
@@ -86,7 +118,91 @@ const getLatLngFromLocation = async (location) => {
   }
 };
 
-// [FUNCTIONAL] Function to process keyword frequencies
+/**
+ * Utility Function: Detect Country Fallback
+ * 
+ * This function attempts to manually detect the name of a country mentioned in a given text.
+ * It searches for matches from a predefined list of country names.
+ * 
+ * - If a country is found, it returns the country name.
+ * - If no match is found, it defaults to "United States of America."
+ * 
+ * @param {string} text The text to search for country names.
+ * @returns {string} The detected country name or a default fallback country.
+ */
+const detectCountryFallback = (text) => {
+  const countries = [
+    "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", 
+    "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", 
+    "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", 
+    "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", 
+    "Burundi", "Cabo Verde", "Cambodia", "Cameroon", "Canada", "Central African Republic", 
+    "Chad", "Chile", "China", "Colombia", "Comoros", "Congo (Congo-Brazzaville)", 
+    "Costa Rica", "Croatia", "Cuba", "Cyprus", "Czechia (Czech Republic)", "Denmark", 
+    "Djibouti", "Dominica", "Dominican Republic", "Ecuador", "Egypt", "El Salvador", 
+    "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini (fmr. Swaziland)", "Ethiopia", 
+    "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", 
+    "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Honduras", 
+    "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy", 
+    "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya", "Kiribati", "Kuwait", "Kyrgyzstan", 
+    "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", 
+    "Luxembourg", "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", 
+    "Marshall Islands", "Mauritania", "Mauritius", "Mexico", "Micronesia (Federated States of)", 
+    "Moldova (Republic of)", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", 
+    "Myanmar", "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", 
+    "Niger", "Nigeria", "North Korea", "North Macedonia", "Norway", "Oman", "Pakistan", 
+    "Palau", "Palestine State", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", 
+    "Poland", "Portugal", "Qatar", "Romania", "Russian Federation", "Rwanda", "Saint Kitts and Nevis", 
+    "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe", 
+    "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", 
+    "Slovenia", "Solomon Islands", "Somalia", "South Africa", "South Korea", "South Sudan", 
+    "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria", "Tajikistan", 
+    "Tanzania", "Thailand", "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", 
+    "Turkey", "Turkmenistan", "Tuvalu", "Uganda", "Ukraine", "United Arab Emirates", 
+    "United Kingdom", "United States of America", "Uruguay", "Uzbekistan", "Vanuatu", "Venezuela", 
+    "Vietnam", "Yemen", "Zambia", "Zimbabwe"
+  ];
+  
+  const lowerText = text.toLowerCase();
+  for (const country of countries) {
+    const lowerCountry = country.toLowerCase();
+    if (lowerText.includes(lowerCountry)) {
+      console.log(`Detected country: ${country}`);
+      return country;
+    }
+  }
+
+  // Default country if none detected from the list (fallback option)
+  return "United States of America";
+};
+
+/**
+ * Extract text content from HTML.
+ * 
+ * @param {string} html HTML content
+ * @returns {string} Plain text content
+ */
+const extractTextFromHTML = (html) => {
+  const text = html
+    .replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, "") // Remove scripts
+    .replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, "") // Remove styles
+    .replace(/<\/?[a-z][\s\S]*?>/gi, "") // Remove HTML tags
+    .replace(/\s+/g, " ") // Collapse whitespace
+    .trim();
+  return text;
+};
+
+// Functional API Endpoints
+/**
+ * Generate a keyword cloud from articles in the database.
+ * 
+ * - Analyzes the text content of articles to identify frequently used words.
+ * - Uses Natural.js for tokenization and word frequency analysis.
+ * 
+ * @param {Object} req Express request object
+ * @param {Object} res Express response object
+ * @returns {JSON} A list of keywords with their respective frequencies
+ */
 const getKeywordCloud = async (req, res) => {
   try {
     const db = getDB();
@@ -149,65 +265,15 @@ const getKeywordCloud = async (req, res) => {
   }
 }; 
 
-// Helper function to extract text from HTML
-const extractTextFromHTML = (html) => {
-  const text = html
-    .replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, "") // Remove scripts
-    .replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, "") // Remove styles
-    .replace(/<\/?[a-z][\s\S]*?>/gi, "") // Remove HTML tags
-    .replace(/\s+/g, " ") // Collapse whitespace
-    .trim();
-  return text;
-};
-
-// Utility function to manually detect country if AI fails
-const detectCountryFallback = (text) => {
-  const countries = [
-    "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", 
-    "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", 
-    "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", 
-    "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", 
-    "Burundi", "Cabo Verde", "Cambodia", "Cameroon", "Canada", "Central African Republic", 
-    "Chad", "Chile", "China", "Colombia", "Comoros", "Congo (Congo-Brazzaville)", 
-    "Costa Rica", "Croatia", "Cuba", "Cyprus", "Czechia (Czech Republic)", "Denmark", 
-    "Djibouti", "Dominica", "Dominican Republic", "Ecuador", "Egypt", "El Salvador", 
-    "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini (fmr. Swaziland)", "Ethiopia", 
-    "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", 
-    "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Honduras", 
-    "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy", 
-    "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya", "Kiribati", "Kuwait", "Kyrgyzstan", 
-    "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", 
-    "Luxembourg", "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", 
-    "Marshall Islands", "Mauritania", "Mauritius", "Mexico", "Micronesia (Federated States of)", 
-    "Moldova (Republic of)", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", 
-    "Myanmar", "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", 
-    "Niger", "Nigeria", "North Korea", "North Macedonia", "Norway", "Oman", "Pakistan", 
-    "Palau", "Palestine State", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", 
-    "Poland", "Portugal", "Qatar", "Romania", "Russian Federation", "Rwanda", "Saint Kitts and Nevis", 
-    "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe", 
-    "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", 
-    "Slovenia", "Solomon Islands", "Somalia", "South Africa", "South Korea", "South Sudan", 
-    "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria", "Tajikistan", 
-    "Tanzania", "Thailand", "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", 
-    "Turkey", "Turkmenistan", "Tuvalu", "Uganda", "Ukraine", "United Arab Emirates", 
-    "United Kingdom", "United States of America", "Uruguay", "Uzbekistan", "Vanuatu", "Venezuela", 
-    "Vietnam", "Yemen", "Zambia", "Zimbabwe"
-  ];
-  
-  const lowerText = text.toLowerCase();
-  for (const country of countries) {
-    const lowerCountry = country.toLowerCase();
-    if (lowerText.includes(lowerCountry)) {
-      console.log(`Detected country: ${country}`);
-      return country;
-    }
-  }
-
-  // Default country if none detected from the list (fallback option)
-  return "United States of America";
-};
-
-// [FUNCTIONAL] Function to check if an article already exists in the database
+/**
+ * Function to Check if an Article Exists in the Database
+ * 
+ * This function checks whether an article with a given URL already exists in the MongoDB collection.
+ * 
+ * @param {string} url The URL of the article to check.
+ * @returns {boolean} `true` if the article exists, otherwise `false`.
+ */
+// (Still got duplicates from the same events. Can implement more checking.)
 const checkArticleExists = async (url) => {
   const db = getDB();
   const collection = db.collection(process.env.COLLECTION_NAME);
@@ -215,7 +281,18 @@ const checkArticleExists = async (url) => {
   return !!article; // Return true jika artikel ditemukan
 };
 
-// [FUNCTIONAL] Function to detect severity and location using OpenAI GPT-4o-Mini
+/**
+ * Function to Detect Severity and Location Using OpenAI GPT
+ * 
+ * This function uses OpenAI GPT to determine:
+ * 1. The severity level of a disruption (Low, Medium, High).
+ * 2. The primary country affected by the disruption.
+ * 
+ * If OpenAI fails to detect a valid country, a manual fallback (`detectCountryFallback`) is used.
+ * 
+ * @param {string} text The article text to analyze.
+ * @returns {Object} An object containing `severity` and `location`.
+ */
 const detectSeverityAndLocation = async (text) => {
   const prompt = `Given the following information about an article "${text}":
                   
@@ -256,7 +333,18 @@ const detectSeverityAndLocation = async (text) => {
   return { severity, location: finalLocation };
 };
 
-// [FUNCTIONAL] Function to detect disruption type using OpenAI GPT-4o-Mini
+/**
+ * Function to Detect Disruption Type Using OpenAI GPT
+ * 
+ * This function classifies the type of disruption described in a given article 
+ * into one of the predefined categories using OpenAI GPT.
+ * 
+ * - It prompts GPT with the article content and a list of possible categories.
+ * - The response is a single category that best describes the disruption.
+ * 
+ * @param {string} text The content of the article to classify.
+ * @returns {string} The detected disruption type or "Unknown" if classification fails.
+ */
 const detectDisruptionType = async (text) => {
   const formattedCategories = categoriesList.map(cat => `'${cat}'`).join(", "); // Format kategori
 
@@ -284,7 +372,17 @@ const detectDisruptionType = async (text) => {
   }
 };
 
-// [FUNCTIONAL] Function to summarize an article using OpenAI GPT-4o-Mini
+/**
+ * Function to Summarize an Article Using OpenAI GPT
+ * 
+ * This function generates a concise summary of a given article using OpenAI GPT.
+ * 
+ * - The summary includes no more than four sentences focusing on the main points, events, or conclusions.
+ * - If the summarization fails, the original text is returned as a fallback.
+ * 
+ * @param {string} text The content of the article to summarize.
+ * @returns {string} A summary of the article or the original text if summarization fails.
+ */
 const summarizeArticle = async (text) => {
   const prompt = `Summarize the following article into a concise overview of no more than four sentences. Focus on the main points, events, or conclusions described: "${text}"`
 
@@ -305,7 +403,18 @@ const summarizeArticle = async (text) => {
   }
 };
 
-// [FUNCTIONAL] Function to save articles to the database (batch insertion)
+/**
+ * Function to Save Articles to the Database (Batch Insertion)
+ * 
+ * This function saves or updates multiple articles in the MongoDB database.
+ * 
+ * - It checks if an article already exists and skips it if it is marked as deleted.
+ * - If the article does not exist, it is inserted into the database.
+ * - If the article exists and is not deleted, it is updated with the new data.
+ * 
+ * @param {Array<Object>} articles An array of articles to save or update in the database.
+ * @returns {void}
+ */
 const saveArticlesToDatabase = async (articles) => {
   try {
     const db = getDB();
@@ -333,7 +442,13 @@ const saveArticlesToDatabase = async (articles) => {
   }
 };
 
-// Function to scrape and save articles
+/**
+ * Scrape and save articles from NewsAPI to the database.
+ * 
+ * - Fetches articles using NewsAPI for a given date range.
+ * - Analyzes and processes each article to detect disruption type, severity, and location.
+ * - Saves the processed articles to MongoDB.
+ */
 const scrapeAndSaveArticles = async (req, res) => {
   try {
     const { from, to } = req.query;
@@ -406,7 +521,13 @@ const scrapeAndSaveArticles = async (req, res) => {
   }
 };
 
-// [FUNCTIONAL] Function to get all articles from the database
+/**
+ * Get all articles from the database.
+ * 
+ * @param {Object} req Express request object
+ * @param {Object} res Express response object
+ * @returns {JSON} List of all articles
+ */
 const getAllArticles = async (req, res) => {
   try {
     const db = getDB();
@@ -420,7 +541,13 @@ const getAllArticles = async (req, res) => {
   }
 };
 
-// [FUNCTIONAL] Function to get all articles from the database with optional filtering
+/**
+ * Get articles filtered by disruption type.
+ * 
+ * @param {Object} req Express request object, expects `disruptionType` as a query parameter
+ * @param {Object} res Express response object
+ * @returns {JSON} List of articles filtered by the specified disruption type
+ */
 const getFilteredArticles = async (req, res) => {
   const disruptionType = req.query.disruptionType;
 
@@ -440,7 +567,13 @@ const getFilteredArticles = async (req, res) => {
   }
 };
 
-// [FUNCTIONAL] Function to get a single article by ID
+/**
+ * Get a single article by its ID.
+ * 
+ * @param {Object} req Express request object, expects `id` as a path parameter
+ * @param {Object} res Express response object
+ * @returns {JSON} Article data if found
+ */
 const getArticleById = async (req, res) => {
   const articleId = req.params.id;
 
@@ -465,7 +598,13 @@ const getArticleById = async (req, res) => {
   }
 };
 
-// Function to soft delete an article
+/**
+ * Delete an article (soft delete).
+ * 
+ * @param {Object} req Express request object, expects `id` as a path parameter
+ * @param {Object} res Express response object
+ * @returns {JSON} Deletion status message
+ */
 const deleteArticle = async (req, res) => {
   const articleId = req.params.id;
 
@@ -490,7 +629,19 @@ const deleteArticle = async (req, res) => {
   }
 };
 
-// Function to delete all articles (development purposes)
+/**
+ * Function to Delete All Articles (Development Purposes)
+ * 
+ * This function removes all articles from the MongoDB collection.
+ * 
+ * - It is primarily intended for development or testing purposes.
+ * - Deletes all documents in the specified collection without any filters.
+ * - Returns the count of deleted articles in the response.
+ * 
+ * @param {Object} req Express request object.
+ * @param {Object} res Express response object.
+ * @returns {JSON} A success message and the total count of deleted articles.
+ */
 const deleteAllArticles = async (req, res) => {
   try {
     const db = getDB();

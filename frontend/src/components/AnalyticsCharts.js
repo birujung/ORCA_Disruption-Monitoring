@@ -1,3 +1,24 @@
+/**
+ * AnalyticsCharts Component
+ * 
+ * This component displays various analytical charts such as donut charts and treemaps
+ * for visualizing data related to disruption types, severity levels, and keyword frequency.
+ * 
+ * - Supports dynamic data fetching via API.
+ * - Provides time-range filtering (e.g., All Time, Last Week, Last Month).
+ * - Uses React ApexCharts for rendering visually appealing charts.
+ * 
+ * Dependencies:
+ * - `axios`: For API requests to fetch chart data.
+ * - `react-apexcharts`: For rendering charts.
+ * - `reactstrap`: For UI components such as `Card`, `Dropdown`, and `CardHeader`.
+ * 
+ * Props:
+ * - `type`: Specifies the type of chart to render. Supported types are:
+ *   - `"disruption"`: Donut chart for disruption type distribution.
+ *   - `"severity"`: Donut chart for severity levels.
+ *   - `"keywordTreemap"`: Treemap chart for keyword frequency.
+ */
 import axios from "axios";
 import React, { useEffect, useState } from "react";
 import ReactApexChart from "react-apexcharts";
@@ -11,6 +32,7 @@ import {
   UncontrolledDropdown,
 } from "reactstrap";
 
+// Predefined colors for chart categories
 const disruptionTypeColors = {
   "Airport Disruption": "#0d6efd",
   "Bankruptcy": "#6610f2",
@@ -41,7 +63,6 @@ const disruptionTypeColors = {
   "CNA": "#c2185b",
   "Unknown": "#f57c00",
 };
-
 const severityColors = {
   High: "#dc3545",   // Merah
   Medium: "#ffc107", // Kuning
@@ -49,11 +70,14 @@ const severityColors = {
 };
 
 const AnalyticsCharts = ({ type }) => {
+  // State variables
   const [chartOptions, setChartOptions] = useState({});
   const [chartSeries, setChartSeries] = useState([]);
   const [timeRange, setTimeRange] = useState("total");
-  const [keywords, setKeywords] = useState([]);
 
+  /**
+   * Fetch data based on chart type and time range.
+   */
   useEffect(() => {
     const fetchData = async () => {
       if (type === "keywordTreemap") {
@@ -61,6 +85,7 @@ const AnalyticsCharts = ({ type }) => {
           const response = await axios.get("/api/articles/keywords");
           const data = response.data
 
+          // Process and filter data for treemap
           const filteredData = data
             .filter((item) => item.word && typeof item.count === "number")
             .map(({ word, count }) => ({ x: word, y: count }))
@@ -93,8 +118,8 @@ const AnalyticsCharts = ({ type }) => {
       let endpoint = "";
       let queryParams = {};
 
+      // Determine endpoint and parameters based on time range and type
       if (timeRange === "week") {
-        // Set correct endpoint for weekly data
         switch (type) {
           case "disruption":
             endpoint = "/api/analytics/weekly-disruption-type-counts";
@@ -137,8 +162,9 @@ const AnalyticsCharts = ({ type }) => {
         const response = await axios.get(endpoint, { params: queryParams });
         const data = response.data;
 
+        // Group and map data for chart
         const groupedData = data.reduce((acc, item) => {
-          const label = item.disruptionType || item.severity || "Unknown"; // Properti benar
+          const label = item.disruptionType || item.severity || "Unknown";
           if (!acc[label]) acc[label] = 0;
           acc[label] += parseInt(item.total, 10);
           return acc;
@@ -180,7 +206,7 @@ const AnalyticsCharts = ({ type }) => {
           tooltip: {
             y: {
               formatter: function (value, { seriesIndex, dataPointIndex }) {
-                return value; // Return the actual count
+                return value;
               }
             }
           },
@@ -200,6 +226,9 @@ const AnalyticsCharts = ({ type }) => {
     fetchData();
   }, [type, timeRange]);
 
+  /**
+   * Get chart title based on type.
+   */
   const getTitle = () => {
     switch (type) {
       case "disruption":
@@ -213,34 +242,16 @@ const AnalyticsCharts = ({ type }) => {
     }
   };
 
+  /**
+   * Handle time range selection.
+   */
   const handleTimeRangeChange = (range) => {
-    setTimeRange(range); // Change time range
+    setTimeRange(range);
   };
 
-  const getLastWeekDateRange = () => {
-    const today = new Date();
-    const dayOfWeek = today.getDay();
-    const lastSunday = new Date(today);
-    lastSunday.setDate(today.getDate() - dayOfWeek - 7);
-    const startOfWeek = new Date(lastSunday);
-    startOfWeek.setDate(lastSunday.getDate() - 6);
-    return {
-      start: startOfWeek.toISOString().split("T")[0],
-      end: lastSunday.toISOString().split("T")[0],
-    };
-  };
-
-  const getLastMonthDateRange = () => {
-    const today = new Date();
-    const lastMonth = new Date(today.setMonth(today.getMonth() - 1));
-    const start = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1);
-    const end = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0);
-    return {
-      start: start.toISOString().split("T")[0],
-      end: end.toISOString().split("T")[0],
-    };
-  };
-
+  /**
+   * Render the chart.
+   */
   if (type === "keywordTreemap") {
     return (
       <Card>

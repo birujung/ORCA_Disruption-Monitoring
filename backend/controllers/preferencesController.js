@@ -1,51 +1,104 @@
-const pool = require("../config/db.js");
+/**
+ * Article Filtering and Utility Endpoints
+ * 
+ * This module provides endpoints to filter articles based on user preferences, 
+ * fetch distinct values for dropdowns, and perform generic search functionality.
+ * 
+ * Dependencies:
+ * - MongoDB for querying and filtering article data.
+ * - Express.js for handling API requests and responses.
+ */
+const { getDB } = require("../config/db.js");
+const { ObjectId } = require("mongodb");
 
-// Function to get available locations for location dropdown
+/**
+ * Get Available Locations for Dropdown
+ * 
+ * This function retrieves distinct locations from the database for populating a dropdown.
+ * Filters out deleted articles (`isdeleted: true`).
+ * 
+ * @param {Object} req Express request object.
+ * @param {Object} res Express response object.
+ * @returns {JSON} Sorted list of unique locations.
+ */
 const getAvailableLocations = async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT DISTINCT location FROM Cities
-      WHERE IsDeleted = false
-      ORDER BY location ASC;
-    `);
-    res.status(200).json(result.rows.map(row => row.location));
+    const db = getDB();
+    const collection = db.collection(process.env.COLLECTION_NAME);
+
+    const locations = await collection.distinct("location", { isdeleted: { $ne: true } });
+
+    res.status(200).json(locations.sort());
   } catch (error) {
     console.error("Error fetching available locations:", error.message);
     res.status(500).json({ message: "Error fetching available locations." });
   }
 };
 
-// Function to get available disruption types for disruption type dropdown
+/**
+ * Get Available Disruption Types for Dropdown
+ * 
+ * This function retrieves distinct disruption types from the database for populating a dropdown.
+ * Filters out deleted articles (`isdeleted: true`).
+ * 
+ * @param {Object} req Express request object.
+ * @param {Object} res Express response object.
+ * @returns {JSON} Sorted list of unique disruption types.
+ */
 const getAvailableDisruptionTypes = async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT DISTINCT category_name FROM Disruption_Categories
-      WHERE IsDeleted = false
-      ORDER BY category_name ASC;
-    `);
-    res.status(200).json(result.rows.map(row => row.category_name));
+    const db = getDB();
+    const collection = db.collection(process.env.COLLECTION_NAME);
+
+    const disruptionTypes = await collection.distinct("disruptionType", { isdeleted: { $ne: true } });
+
+    res.status(200).json(disruptionTypes.sort());
   } catch (error) {
     console.error("Error fetching available disruption types:", error.message);
     res.status(500).json({ message: "Error fetching available disruption types." });
   }
 };
 
-// Function to get available severity levels for severity level dropdown
+/**
+ * Get Available Severity Levels for Dropdown
+ * 
+ * This function retrieves distinct severity levels from the database for populating a dropdown.
+ * Filters out deleted articles (`isdeleted: true`).
+ * 
+ * @param {Object} req Express request object.
+ * @param {Object} res Express response object.
+ * @returns {JSON} Sorted list of unique severity levels.
+ */
 const getAvailableSeverityLevels = async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT DISTINCT severity FROM Articles
-      WHERE IsDeleted = false
-      ORDER BY severity ASC;
-    `);
-    res.status(200).json(result.rows.map(row => row.severity));
+    const db = getDB();
+    const collection = db.collection(process.env.COLLECTION_NAME);
+
+    const severityLevels = await collection.distinct("severity", { isdeleted: { $ne: true } });
+
+    res.status(200).json(severityLevels.sort());
   } catch (error) {
     console.error("Error fetching available severity levels:", error.message);
     res.status(500).json({ message: "Error fetching available severity levels." });
   }
 };
 
-// Function to filter articles based on user preferences
+/**
+ * Filter Articles by User Preferences
+ * 
+ * This function filters articles based on a variety of criteria provided in the query parameters:
+ * - Date range (`fromDate` and `toDate`)
+ * - Locations
+ * - Disruption types
+ * - Severity levels
+ * - Suppliers
+ * 
+ * Filters out deleted articles (`isdeleted: true`) by default.
+ * 
+ * @param {Object} req Express request object with query parameters.
+ * @param {Object} res Express response object.
+ * @returns {JSON} List of filtered articles sorted by published date in descending order.
+ */
 const filterArticlesByPreferences = async (req, res) => {
   const {
     fromDate,
@@ -57,77 +110,89 @@ const filterArticlesByPreferences = async (req, res) => {
     suppliers,
   } = req.query;
 
-  let query = `SELECT * FROM Articles WHERE IsDeleted = false`;
-  const filterClauses = [];
-  const values = [];
+  const db = getDB();
+  const collection = db.collection(process.env.COLLECTION_NAME);
+
+  const filter = { isdeleted: { $ne: true } };
 
   // Filter by date range if both fromDate and toDate are provided
   if (fromDate && toDate) {
-    filterClauses.push(`publishedDate BETWEEN $${values.length + 1} AND $${values.length + 2}`);
-    values.push(fromDate, toDate);
+    filter.publishedDate = {
+      $gte: new Date(fromDate),
+      $lte: new Date(toDate),
+    };
   }
 
   // Filter by locations if provided
   if (locations && locations.length > 0) {
-    filterClauses.push(`location = ANY($${values.length + 1}::text[])`);
-    values.push(locations);
-  }
-
-  // Filter by radius if provided
-  if (radius) {
-    filterClauses.push(`
-      ST_DistanceSphere(ST_MakePoint(lat, lng), ST_MakePoint($${values.length + 1}, $${values.length + 2})) <= $${values.length + 3}
-    `);
-    values.push(req.body.userLat, req.body.userLng, radius);
+    filter.location = { $in: locations.split(",") };
   }
 
   // Filter by disruption types if provided
   if (disruptionTypes && disruptionTypes.length > 0) {
-    filterClauses.push(`disruptionType = ANY($${values.length + 1}::text[])`);
-    values.push(disruptionTypes);
+    filter.disruptionType = { $in: disruptionTypes.split(",") };
   }
 
   // Filter by severity levels if provided
   if (severityLevels && severityLevels.length > 0) {
-    filterClauses.push(`severity = ANY($${values.length + 1}::text[])`);
-    values.push(severityLevels);
+    filter.severity = { $in: severityLevels.split(",") };
   }
 
   // Filter by suppliers if provided
   if (suppliers && suppliers.length > 0) {
-    filterClauses.push(`sourceName = ANY($${values.length + 1}::text[])`);
-    values.push(suppliers);
+    filter.sourceName = { $in: suppliers.split(",") };
   }
-
-  // Combine all conditions
-  if (filterClauses.length > 0) {
-    query += ` AND ${filterClauses.join(" AND ")}`;
-  }
-
-  query += ` ORDER BY publishedDate DESC;`;
 
   try {
-    const result = await pool.query(query, values);
-    res.status(200).json(result.rows);
+    const articles = await collection
+      .find(filter)
+      .sort({ publishedDate: -1 })
+      .toArray();
+
+    res.status(200).json(articles);
   } catch (error) {
     console.error("Error filtering articles:", error.message);
     res.status(500).json({ message: "Error filtering articles." });
   }
 };
 
-// Endpoint to search articles by a generic search term
+/**
+ * Search Articles by Query
+ * 
+ * This function performs a generic search on articles based on a user-provided query.
+ * The search is conducted on the following fields:
+ * - Title
+ * - Location
+ * - Disruption type
+ * - Severity level
+ * 
+ * Filters out deleted articles (`isdeleted: true`) by default.
+ * 
+ * @param {Object} req Express request object with a `query` parameter.
+ * @param {Object} res Express response object.
+ * @returns {JSON} List of articles matching the search query, sorted by published date in descending order.
+ */
 const searchArticles = async (req, res) => {
   const { query } = req.query;
 
-  try {
-    const result = await pool.query(`
-      SELECT * FROM Articles
-      WHERE IsDeleted = false
-      AND (title ILIKE $1 OR location ILIKE $1 OR disruptiontype ILIKE $1 OR severity ILIKE $1)
-      ORDER BY publisheddate DESC
-    `, [`%${query}%`]);
+  const db = getDB();
+  const collection = db.collection(process.env.COLLECTION_NAME);
 
-    res.status(200).json(result.rows);
+  try {
+    const articles = await collection
+      .find({
+        isdeleted: { $ne: true },
+        $or: [
+          { title: { $regex: query, $options: "i" } },
+          { location: { $regex: query, $options: "i" } },
+          { disruptionType: { $regex: query, $options: "i" } },
+          { severity: { $regex: query, $options: "i" } },
+        ],
+      })
+      .sort({ publishedDate: -1 })
+      .toArray();
+
+    res.status(200).json(articles);
   } catch (error) {
     console.error("Error searching articles:", error.message);
     res.status(500).json({ message: "Error searching articles." });

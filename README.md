@@ -112,7 +112,7 @@ cd ORCA_Disruption-Monitoring
 
 ### 4. Run Both (Backend and Frontend) Setup
 
-1. Navigate to the root folder:
+1. Navigate to the root folder
 
 2. Install dependencies:
    ```bash
@@ -126,7 +126,7 @@ cd ORCA_Disruption-Monitoring
 
 4. Start both of the backend and frontend development server:
    ```bash
-   concurrently \"npm run start:backend"\ \"npm run start:frontend"\
+   concurrently "npm run start:backend" "npm run start:frontend"
    ```
    The frontend will run at `http://localhost:3000`.
 

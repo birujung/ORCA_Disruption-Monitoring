@@ -1,3 +1,20 @@
+/**
+ * ArticlesTable Component
+ * 
+ * This component displays a table of articles with features such as:
+ * - Sorting, filtering, and pagination.
+ * - Article scraping and refreshing.
+ * - Detailed view with a modal displaying article information and a map of the impacted location.
+ * 
+ * Dependencies:
+ * - `axios`: For fetching and posting article data to the API.
+ * - `google-maps-react`: For rendering a map with markers for impacted locations.
+ * - `moment`: For date formatting.
+ * - `reactstrap`: For UI elements such as `Badge`, `Modal`, and `Table`.
+ * 
+ * Props:
+ * - `google`: Passed by `GoogleApiWrapper` for integrating Google Maps API.
+ */
 import axios from "axios";
 import { GoogleApiWrapper, Map, Marker } from "google-maps-react";
 import moment from "moment";
@@ -17,11 +34,13 @@ const formatDescription = (text) => {
   return `${sentences.slice(0, 2).join(". ")}.`;
 };
 
+// Map styles
 const mapStyles = {
   width: "750px",
   height: "350px",
 };
 
+// Generate random tier and action (mock data)
 const randomTier = () => `Tier ${Math.floor(Math.random() * 5) + 1}`;
 const randomAction = () => (Math.random() > 0.5 ? "Active" : "Closed");
 
@@ -30,11 +49,13 @@ const ArticlesTable = (props) => {
   const [loading, setLoading] = useState(false);
   const [isScraping, setIsScraping] = useState(false);
 
-  // Modal related states
+  // Modal states
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Fetch articles on component mount
+  /**
+   * Fetch articles on component mount.
+   */
   useEffect(() => {
     const fetchArticles = async () => {
       setLoading(true);
@@ -54,6 +75,9 @@ const ArticlesTable = (props) => {
     fetchArticles();
   }, []);
   
+  /**
+   * Fetch a specific article by ID.
+   */
   const fetchArticleById = async (id) => {
     try {
       const response = await axios.get(`/api/articles/${id}`);
@@ -64,6 +88,9 @@ const ArticlesTable = (props) => {
     }
   };  
 
+  /**
+   * Handle scraping and refreshing articles.
+   */
   const handleScrapeArticles = async () => {
     setIsScraping(true);
     try {
@@ -80,6 +107,9 @@ const ArticlesTable = (props) => {
     }
   };
 
+  /**
+   * Define columns for the table.
+   */
   const columns = useMemo(
     () => [
       {
@@ -156,8 +186,7 @@ const ArticlesTable = (props) => {
   };
 
   const getSeverityColor = (severity) => severityColors[severity] || "gray";
-
-  const defaultLocation = { lat: 1.3521, lng: 103.8198 }; // Singapore Default
+  const defaultLocation = { lat: 35.8617, lng: 104.1954 };  // China default location (Can change based on specific supplier use case)
 
   return (
     <div className="card">
