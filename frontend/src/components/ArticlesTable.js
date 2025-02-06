@@ -1,17 +1,17 @@
 /**
  * ArticlesTable Component
- * 
+ *
  * This component displays a table of articles with features such as:
  * - Sorting, filtering, and pagination.
  * - Article scraping and refreshing.
  * - Detailed view with a modal displaying article information and a map of the impacted location.
- * 
+ *
  * Dependencies:
  * - `axios`: For fetching and posting article data to the API.
  * - `google-maps-react`: For rendering a map with markers for impacted locations.
  * - `moment`: For date formatting.
  * - `reactstrap`: For UI elements such as `Badge`, `Modal`, and `Table`.
- * 
+ *
  * Props:
  * - `google`: Passed by `GoogleApiWrapper` for integrating Google Maps API.
  */
@@ -30,7 +30,9 @@ const formatDate = (date) => {
 
 const formatDescription = (text) => {
   if (!text) return "No description available.";
-  const sentences = text.split(".").filter((sentence) => sentence.trim() !== "");
+  const sentences = text
+    .split(".")
+    .filter((sentence) => sentence.trim() !== "");
   return `${sentences.slice(0, 2).join(". ")}.`;
 };
 
@@ -61,8 +63,8 @@ const ArticlesTable = (props) => {
       setLoading(true);
       try {
         const response = await axios.get("/api/articles");
-        const sortedArticles = response.data.sort((a, b) =>
-          moment(b.publishedDate).diff(moment(a.publishedDate)) // Perbaiki publishedDate
+        const sortedArticles = response.data.sort(
+          (a, b) => moment(b.publishedDate).diff(moment(a.publishedDate)), // Perbaiki publishedDate
         );
         setArticles(sortedArticles);
       } catch (error) {
@@ -71,10 +73,10 @@ const ArticlesTable = (props) => {
         setLoading(false);
       }
     };
-  
+
     fetchArticles();
   }, []);
-  
+
   /**
    * Fetch a specific article by ID.
    */
@@ -86,7 +88,7 @@ const ArticlesTable = (props) => {
     } catch (error) {
       console.error("Failed to fetch article by ID:", error);
     }
-  };  
+  };
 
   /**
    * Handle scraping and refreshing articles.
@@ -97,7 +99,7 @@ const ArticlesTable = (props) => {
       await axios.post("/api/articles/scrape");
       const response = await axios.get("/api/articles");
       const sortedArticles = response.data.sort((a, b) =>
-        moment(b.publishedDate).diff(moment(a.publishedDate))
+        moment(b.publishedDate).diff(moment(a.publishedDate)),
       );
       setArticles(sortedArticles);
     } catch (error) {
@@ -176,7 +178,7 @@ const ArticlesTable = (props) => {
         ),
       },
     ],
-    []
+    [],
   );
 
   const severityColors = {
@@ -186,7 +188,7 @@ const ArticlesTable = (props) => {
   };
 
   const getSeverityColor = (severity) => severityColors[severity] || "gray";
-  const defaultLocation = { lat: 35.8617, lng: 104.1954 };  // China default location (Can change based on specific supplier use case)
+  const defaultLocation = { lat: 35.8617, lng: 104.1954 }; // China default location (Can change based on specific supplier use case)
 
   return (
     <div className="card">
@@ -211,21 +213,45 @@ const ArticlesTable = (props) => {
       </div>
 
       {/* Modal for displaying article details */}
-      <Modal size="lg" isOpen={isModalOpen} toggle={() => setIsModalOpen(false)} centered>
+      <Modal
+        size="lg"
+        isOpen={isModalOpen}
+        toggle={() => setIsModalOpen(false)}
+        centered
+      >
         <ModalHeader toggle={() => setIsModalOpen(false)}>
           <h2>{selectedArticle?.title}</h2>
         </ModalHeader>
         <ModalBody>
           <div>
-            <p><strong>Published Date:</strong> {formatDate(selectedArticle?.publishedDate)}</p>
-            <p><strong>Location:</strong> {selectedArticle?.location}</p>
-            <p><strong>Disruption Type:</strong> {selectedArticle?.disruptiontype}</p>
-            <p><strong>Severity:</strong> 
-              <Badge color={selectedArticle?.severity === "High" ? "danger" : selectedArticle?.severity === "Medium" ? "warning" : "success"}>
+            <p>
+              <strong>Published Date:</strong>{" "}
+              {formatDate(selectedArticle?.publishedDate)}
+            </p>
+            <p>
+              <strong>Location:</strong> {selectedArticle?.location}
+            </p>
+            <p>
+              <strong>Disruption Type:</strong>{" "}
+              {selectedArticle?.disruptiontype}
+            </p>
+            <p>
+              <strong>Severity:</strong>
+              <Badge
+                color={
+                  selectedArticle?.severity === "High"
+                    ? "danger"
+                    : selectedArticle?.severity === "Medium"
+                    ? "warning"
+                    : "success"
+                }
+              >
                 {selectedArticle?.severity}
               </Badge>
             </p>
-            <p><strong>Description:</strong> {selectedArticle?.text}</p>
+            <p>
+              <strong>Description:</strong> {selectedArticle?.text}
+            </p>
             <p>
               <strong>Source:</strong>{" "}
               {selectedArticle?.url ? (
@@ -233,7 +259,11 @@ const ArticlesTable = (props) => {
                   href={selectedArticle.url}
                   target="_blank" // Buka URL di tab baru
                   rel="noopener noreferrer" // Keamanan tambahan
-                  style={{ color: "#007bff", textDecoration: "underline", cursor: "pointer" }}
+                  style={{
+                    color: "#007bff",
+                    textDecoration: "underline",
+                    cursor: "pointer",
+                  }}
                 >
                   {selectedArticle.url}
                 </a>
@@ -244,7 +274,10 @@ const ArticlesTable = (props) => {
           </div>
 
           {/* Google Map */}
-          <div className="map-container" style={{ height: "400px", width: "100%" }}>
+          <div
+            className="map-container"
+            style={{ height: "400px", width: "100%" }}
+          >
             <Map
               google={props.google}
               style={mapStyles}
@@ -261,7 +294,7 @@ const ArticlesTable = (props) => {
                 }}
                 icon={{
                   url: `http://maps.google.com/mapfiles/ms/icons/${getSeverityColor(
-                    selectedArticle?.severity
+                    selectedArticle?.severity,
                   )}-dot.png`,
                 }}
               />

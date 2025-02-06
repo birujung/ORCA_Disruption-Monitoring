@@ -1,18 +1,18 @@
 /**
  * TableContainer Component
- * 
- * This component provides a highly customizable, paginated, sortable, and searchable table 
+ *
+ * This component provides a highly customizable, paginated, sortable, and searchable table
  * built with `@tanstack/react-table` and styled using Reactstrap.
- * 
+ *
  * - Supports fetching data dynamically via API or using data passed as props.
  * - Includes debounced global search functionality for filtering table data.
  * - Enables column-level sorting and pagination with page size control.
- * 
+ *
  * Dependencies:
  * - `@tanstack/react-table`: For advanced table features such as sorting, filtering, and pagination.
  * - `axios`: For making API requests.
  * - `reactstrap`: For UI components such as `Input` and `Pagination`.
- * 
+ *
  * Props:
  * - `columns`: Array of column definitions for the table.
  * - `data`: (Optional) Array of initial data to populate the table. If not provided, data will be fetched from the `/api/articles` endpoint.
@@ -33,12 +33,7 @@ import {
 } from "@tanstack/react-table";
 import axios from "axios";
 import React, { useEffect, useState } from "react";
-import {
-  Input,
-  Pagination,
-  PaginationItem,
-  PaginationLink,
-} from "reactstrap";
+import { Input, Pagination, PaginationItem, PaginationLink } from "reactstrap";
 
 const TableContainer = ({
   columns,
@@ -91,8 +86,8 @@ const TableContainer = ({
       const lowerCaseFilter = globalFilter.toLowerCase();
       const filtered = articles.filter((article) =>
         Object.values(article).some((value) =>
-          String(value).toLowerCase().includes(lowerCaseFilter)
-        )
+          String(value).toLowerCase().includes(lowerCaseFilter),
+        ),
       );
       setFilteredArticles(filtered);
     }
@@ -161,12 +156,14 @@ const TableContainer = ({
           <PaginationLink onClick={() => table.setPageIndex(i)}>
             {i + 1}
           </PaginationLink>
-        </PaginationItem>
+        </PaginationItem>,
       );
     }
 
     return pages;
   };
+
+  console.log("table", table);
 
   return (
     <div>
@@ -198,7 +195,7 @@ const TableContainer = ({
                       ? null
                       : flexRender(
                           header.column.columnDef.header,
-                          header.getContext()
+                          header.getContext(),
                         )}
                     {header.column.getIsSorted() === "asc"
                       ? " ▲"
@@ -237,7 +234,9 @@ const TableContainer = ({
           </PaginationItem>
           {getPageNumbers()}
           <PaginationItem disabled={!table.getCanNextPage()}>
-            <PaginationLink onClick={() => table.nextPage()}>Next</PaginationLink>
+            <PaginationLink onClick={() => table.nextPage()}>
+              Next
+            </PaginationLink>
           </PaginationItem>
         </Pagination>
       </div>
