@@ -1,18 +1,18 @@
 /**
  * AnalyticsCharts Component
- * 
+ *
  * This component displays various analytical charts such as donut charts and treemaps
  * for visualizing data related to disruption types, severity levels, and keyword frequency.
- * 
+ *
  * - Supports dynamic data fetching via API.
  * - Provides time-range filtering (e.g., All Time, Last Week, Last Month).
  * - Uses React ApexCharts for rendering visually appealing charts.
- * 
+ *
  * Dependencies:
  * - `axios`: For API requests to fetch chart data.
  * - `react-apexcharts`: For rendering charts.
  * - `reactstrap`: For UI components such as `Card`, `Dropdown`, and `CardHeader`.
- * 
+ *
  * Props:
  * - `type`: Specifies the type of chart to render. Supported types are:
  *   - `"disruption"`: Donut chart for disruption type distribution.
@@ -34,39 +34,45 @@ import {
 
 // Predefined colors for chart categories
 const disruptionTypeColors = {
-  "Airport Disruption": "#0d6efd",
-  "Bankruptcy": "#6610f2",
-  "Business Spin-Off": "#6f42c1",
-  "Business Sale": "#00c292",
-  "Chemical Spill": "#ffbc00",
-  "Corruption": "#ff5b5b",
-  "Company Split": "#dc3545",
-  "Cyber Attack": "#ffc107",
-  "FDA/EMA/OSHA Action": "#28a745",
-  "Factory Fire": "#17a2b8",
-  "Fine": "#ff8c00",
-  "Geopolitical": "#e83e8c",
-  "Leadership Transition": "#fd7e14",
-  "Legal Action": "#20c997",
-  "Merger & Acquisition": "#f44336",
-  "Port Disruption": "#9c27b0",
-  "Protest/Riot": "#3f51b5",
-  "Supply Shortage": "#8bc34a",
-  "Earthquake": "#00bcd4",
-  "Extreme Weather": "#cddc39",
-  "Flood": "#ffeb3b",
-  "Hurricane": "#607d8b",
-  "Tornado": "#9e9e9e",
-  "Volcano": "#3e2723",
-  "Human Health": "#8e24aa",
-  "Power Outage": "#795548",
-  "CNA": "#c2185b",
-  "Unknown": "#f57c00",
+  // Only save PESTLE Color
+  Political: "#0d6efd",
+  Economic: "#6610f2",
+  Social: "#6f42c1",
+  Technological: "#00c292",
+  Environmental: "#ffbc00",
+  Legal: "#ff5b5b",
+  // Bankruptcy: "#6610f2",
+  // "Business Spin-Off": "#6f42c1",
+  // "Business Sale": "#00c292",
+  // "Chemical Spill": "#ffbc00",
+  // Corruption: "#ff5b5b",
+  // "Company Split": "#dc3545",
+  // "Cyber Attack": "#ffc107",
+  // "FDA/EMA/OSHA Action": "#28a745",
+  // "Factory Fire": "#17a2b8",
+  // Fine: "#ff8c00",
+  // Geopolitical: "#e83e8c",
+  // "Leadership Transition": "#fd7e14",
+  // "Legal Action": "#20c997",
+  // "Merger & Acquisition": "#f44336",
+  // "Port Disruption": "#9c27b0",
+  // "Protest/Riot": "#3f51b5",
+  // "Supply Shortage": "#8bc34a",
+  // Earthquake: "#00bcd4",
+  // "Extreme Weather": "#cddc39",
+  // Flood: "#ffeb3b",
+  // Hurricane: "#607d8b",
+  // Tornado: "#9e9e9e",
+  // Volcano: "#3e2723",
+  // "Human Health": "#8e24aa",
+  // "Power Outage": "#795548",
+  // CNA: "#c2185b",
+  // Unknown: "#f57c00",
 };
 const severityColors = {
-  High: "#dc3545",   // Merah
+  High: "#dc3545", // Merah
   Medium: "#ffc107", // Kuning
-  Low: "#28a745",    // Hijau
+  Low: "#28a745", // Hijau
 };
 
 const AnalyticsCharts = ({ type }) => {
@@ -83,7 +89,7 @@ const AnalyticsCharts = ({ type }) => {
       if (type === "keywordTreemap") {
         try {
           const response = await axios.get("/api/articles/keywords");
-          const data = response.data
+          const data = response.data;
 
           // Process and filter data for treemap
           const filteredData = data
@@ -91,7 +97,7 @@ const AnalyticsCharts = ({ type }) => {
             .map(({ word, count }) => ({ x: word, y: count }))
             .slice(0, 20);
 
-          console.log(filteredData)
+          console.log(filteredData);
 
           setChartOptions({
             chart: { type: "treemap", height: 350 },
@@ -168,12 +174,12 @@ const AnalyticsCharts = ({ type }) => {
           if (!acc[label]) acc[label] = 0;
           acc[label] += parseInt(item.total, 10);
           return acc;
-        }, {});        
+        }, {});
 
         const categories = Object.keys(groupedData);
         const series = categories.map((category) => groupedData[category]);
         const colors = categories.map(
-          (category) => disruptionTypeColors[category] || "#000000"
+          (category) => disruptionTypeColors[category] || "#000000",
         );
 
         setChartOptions({
@@ -184,17 +190,19 @@ const AnalyticsCharts = ({ type }) => {
           labels: categories,
           colors:
             type === "severity"
-              ? categories.map((category) => severityColors[category] || "#000000")
+              ? categories.map(
+                  (category) => severityColors[category] || "#000000",
+                )
               : colors,
           plotOptions: {
             pie: {
               donut: {
-                size: '40%',
+                size: "40%",
                 labels: {
                   show: false,
                   value: {
                     show: true,
-                    fontSize: '14px',
+                    fontSize: "14px",
                   },
                   total: {
                     show: false,
@@ -207,8 +215,8 @@ const AnalyticsCharts = ({ type }) => {
             y: {
               formatter: function (value, { seriesIndex, dataPointIndex }) {
                 return value;
-              }
-            }
+              },
+            },
           },
           legend: {
             show: type !== "disruption" && type !== "severity",
@@ -283,15 +291,21 @@ const AnalyticsCharts = ({ type }) => {
               {timeRange === "week"
                 ? "Last Week"
                 : timeRange === "month"
-                ? "Last Month" 
+                ? "Last Month"
                 : "All Time"}
               <i className="mdi mdi-chevron-down ms-1"></i>
             </span>
           </DropdownToggle>
           <DropdownMenu className="dropdown-menu-end">
-            <DropdownItem onClick={() => handleTimeRangeChange("total")}>All Time</DropdownItem>
-            <DropdownItem onClick={() => handleTimeRangeChange("week")}>Last Week</DropdownItem>
-            <DropdownItem onClick={() => handleTimeRangeChange("month")}>Last Month</DropdownItem>
+            <DropdownItem onClick={() => handleTimeRangeChange("total")}>
+              All Time
+            </DropdownItem>
+            <DropdownItem onClick={() => handleTimeRangeChange("week")}>
+              Last Week
+            </DropdownItem>
+            <DropdownItem onClick={() => handleTimeRangeChange("month")}>
+              Last Month
+            </DropdownItem>
           </DropdownMenu>
         </UncontrolledDropdown>
       </CardHeader>
