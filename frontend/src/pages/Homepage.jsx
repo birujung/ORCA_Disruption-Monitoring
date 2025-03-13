@@ -13,14 +13,28 @@
  * - `AnalyticsCharts`: Component for rendering various analytics visualizations.
  * - `ArticlesTable`: Component for displaying and interacting with article data.
  */
-import React from "react";
-import { Card, Col, Container, Row, CardHeader } from "reactstrap";
+import React, { useState } from "react";
+import {
+  Card,
+  Col,
+  Container,
+  Row,
+  CardHeader,
+  Dropdown,
+  DropdownToggle,
+  DropdownMenu,
+  DropdownItem,
+} from "reactstrap";
 import AnalyticsCharts from "../components/AnalyticsCharts";
 import ArticlesTable from "../components/ArticlesTable";
 import { ComposableMap, Geographies, Geography } from "react-simple-maps";
-import GaugeChart from "react-gauge-chart";
+import Globe from "./Globe";
 
 const Homepage = () => {
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  const toggle = () => setDropdownOpen((prevState) => !prevState);
+
   return (
     <>
       <div className="page-title-box">
@@ -30,10 +44,50 @@ const Homepage = () => {
         <div className="w-[60%]">
           <Container fluid>
             {/* Header */}
+            {/* <CardHeader>World Map</CardHeader> */}
             {/* Analytics Section */}
             <Row className="px-3">
-              <Card className="p-2 shadow-sm d-flex align-items-stretch">
-                <ComposableMap>
+              <Card className="p-2 shadow-sm flex align-items-stretch">
+                <Dropdown
+                  direction="down"
+                  isOpen={dropdownOpen}
+                  toggle={toggle}
+                >
+                  <DropdownToggle
+                    style={{
+                      backgroundColor: "#eee",
+                      color: "#4e4e4e",
+                      border: "none",
+                    }}
+                    caret
+                  >
+                    Menus
+                  </DropdownToggle>
+                  <DropdownMenu>
+                    <DropdownItem header>Supplier</DropdownItem>
+                    <DropdownItem>Singapore</DropdownItem>
+                    <DropdownItem divider />
+                    <DropdownItem header>Markets</DropdownItem>
+                    <DropdownItem>America</DropdownItem>
+                    <DropdownItem>Europe</DropdownItem>
+                    <DropdownItem>South East Asia</DropdownItem>
+                    <DropdownItem divider />
+                    <DropdownItem header>All Routes</DropdownItem>
+                    <DropdownItem>HK to JP</DropdownItem>
+                    <DropdownItem>US to VN</DropdownItem>
+                    <DropdownItem>TH to AU</DropdownItem>
+                    <DropdownItem divider />
+                    <DropdownItem header>Distribution Center</DropdownItem>
+                    <DropdownItem>DC01</DropdownItem>
+                    <DropdownItem>DC02</DropdownItem>
+                  </DropdownMenu>
+                </Dropdown>
+              </Card>
+            </Row>
+            <Row className="px-3">
+              <Card className="p-2 shadow-sm flex align-items-stretch">
+                <Globe />
+                {/* <ComposableMap>
                   <Geographies geography="/features.json">
                     {({ geographies }) =>
                       geographies.map((geo) => (
@@ -41,7 +95,7 @@ const Homepage = () => {
                       ))
                     }
                   </Geographies>
-                </ComposableMap>
+                </ComposableMap> */}
               </Card>
               {/* <Col xl={3} lg={4} md={6} className="mb-2"></Col>
               <Col xl={3} lg={4} md={6} className="mb-2">
@@ -61,19 +115,11 @@ const Homepage = () => {
         </div>
         <div className="w-[40%]">
           <Card className="p-2 shadow-sm d-flex align-items-stretch flex justify-center items-center">
-            <CardHeader className="d-flex align-items-center justify-content-between">
+            {/* <CardHeader className="d-flex align-items-center justify-content-between">
               <h5 className="card-title mb-0">Sentiment Score</h5>
             </CardHeader>
-            <GaugeChart
-              style={{
-                color: "gray",
-                width: "400px",
-                margin: "auto",
-              }}
-              className="w-full"
-              id="gauge-chart1"
-            />
-            {/* <AnalyticsCharts type="disruption" /> */}
+             */}
+            <AnalyticsCharts type="disruption" />
           </Card>
 
           <Card

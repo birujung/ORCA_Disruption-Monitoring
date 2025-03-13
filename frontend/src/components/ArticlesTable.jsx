@@ -21,6 +21,9 @@ import moment from "moment";
 import React, { useEffect, useMemo, useState } from "react";
 import { Badge, Modal, ModalBody, ModalHeader } from "reactstrap";
 import TableContainer from "./common/TableContainer";
+import GaugeComponent from "react-gauge-component";
+
+const MOCK_VALUE = Math.floor(Math.random() * 100);
 
 // Helper functions
 const formatDate = (date) => {
@@ -224,6 +227,44 @@ const ArticlesTable = (props) => {
         </ModalHeader>
         <ModalBody>
           <div>
+            <p>
+              <strong>Sentiment Score:</strong>{" "}
+            </p>
+            <div className="flex justify-center items-center">
+              <GaugeComponent
+                value={MOCK_VALUE}
+                style={{
+                  width: "300px",
+                  height: "20px;",
+                }}
+                arc={{
+                  emptyColor: "#eee",
+                  subArcs: [
+                    {
+                      limit: 20,
+                      color: "#EA4228",
+                      showTick: true,
+                    },
+                    {
+                      limit: 40,
+                      color: "#F58B19",
+                      showTick: true,
+                    },
+                    {
+                      limit: 60,
+                      color: "#F5CD19",
+                      showTick: true,
+                    },
+                    {
+                      limit: 100,
+                      color: "#5BE12C",
+                      showTick: true,
+                    },
+                  ],
+                }}
+                pointer={{ type: "arrow", elastic: true }}
+              />
+            </div>
             <p>
               <strong>Published Date:</strong>{" "}
               {formatDate(selectedArticle?.publishedDate)}

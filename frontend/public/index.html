@@ -12,6 +12,276 @@
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <script src="https://cdn.tailwindcss.com"></script>
 
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://esm.sh/three",
+          "three/": "https://esm.sh/three/"
+        }
+      }
+    </script>
+    <script type="module">
+      import ThreeGlobe from "https://esm.sh/three-globe?external=three";
+      import * as THREE from "https://esm.sh/three";
+      import { TrackballControls } from "three/examples/jsm/controls/TrackballControls.js?external=three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js?external=three";
+      import { CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js?external=three";
+
+      // Gen random ripples data
+      const N = 20;
+      const gData = [...Array(N).keys()]
+        .map((e) => ({
+          id: e + 1,
+          lat: (Math.random() - 0.5) * 180,
+          lng: (Math.random() - 0.5) * 360,
+          maxR: Math.random() * 10 + 3,
+          propagationSpeed: (Math.random() - 0.5) * 20 + 1,
+          repeatPeriod: Math.random() * 2000 + 200,
+          size: 20 + Math.random() * 10,
+          color: [
+            "#dc3545", //red
+            "#ffc107", // yellow
+            "#28a745", //green
+          ][Math.round(Math.random() * 2)],
+        }))
+        .concat([
+          // start
+          {
+            id: Date.now(),
+            lat: 13.56952962840354,
+            lng: 100.93982538735933,
+            maxR: 3,
+            size: 35,
+            color: "white",
+            propagationSpeed: 2,
+            repeatPeriod: 200,
+          },
+          {
+            id: Date.now() + 1,
+            lat: 22.724715975468044,
+            lng: 113.78787851386144,
+            maxR: 3,
+            size: 35,
+            color: "white",
+            propagationSpeed: 1,
+            repeatPeriod: 200,
+          },
+          {
+            id: Date.now() + 2,
+            lat: 43.558037537937835,
+            lng: -89.49127008240136,
+            maxR: 3,
+            size: 35,
+            color: "white",
+            propagationSpeed: 1,
+            repeatPeriod: 200,
+          },
+          // end
+          {
+            id: Date.now() + 3,
+            lat: -33.821678770353955,
+            lng: 150.77861086513602,
+            maxR: 3,
+            size: 35,
+            color: "white",
+            propagationSpeed: 2,
+            repeatPeriod: 200,
+          },
+          {
+            id: Date.now() + 4,
+            lat: 35.48924769943459,
+            lng: 139.74518826441798,
+            maxR: 3,
+            size: 35,
+            color: "white",
+            propagationSpeed: 1,
+            repeatPeriod: 200,
+          },
+          {
+            id: Date.now() + 5,
+            lat: 10.859316199964683,
+            lng: 106.61806731035522,
+            maxR: 3,
+            size: 35,
+            color: "white",
+            propagationSpeed: 1,
+            repeatPeriod: 200,
+          },
+        ]);
+
+      const markerSvg = `<svg viewBox="-4 0 36 36">
+              <path fill="currentColor" d="M14,0 C21.732,0 28,5.641 28,12.6 C28,23.963 14,36 14,36 C14,36 0,24.064 0,12.6 C0,5.641 6.268,0 14,0 Z"></path>
+              <circle fill="black" cx="14" cy="14" r="7"></circle>
+            </svg>`;
+
+      // Gen random Marker data
+      const MarkerN = 30;
+      const markerData = [...Array(MarkerN).keys()].map((e) => ({
+        id: e,
+        lat: (Math.random() - 0.5) * 180,
+        lng: (Math.random() - 0.5) * 360,
+        size: 7 + Math.random() * 30,
+        color: [
+          "#dc3545", //red
+          "white",
+          "#ffc107", // yellow
+          "#28a745", //green
+        ][Math.round(Math.random() * 3)],
+      }));
+      // Start
+      // 1. bankok 13.56952962840354, 100.93982538735933
+      // 2. China HK /SZ 22.724715975468044, 113.78787851386144
+      // 3. US 43.558037537937835, -89.49127008240136
+
+      // END
+      // 1. AU -33.821678770353955, 150.77861086513602
+      // 2. Japan 35.48924769943459, 139.74518826441798
+      // 3. Vietnam 10.859316199964683, 106.61806731035522
+      const arcColor = "#ffe800";
+      const arcsData = [
+        {
+          // Bankok -> AU
+          startLat: 13.56952962840354,
+          startLng: 100.93982538735933,
+          endLat: -33.821678770353955,
+          endLng: 150.77861086513602,
+          color: arcColor,
+        },
+        {
+          // China -> Japan
+          startLat: 22.724715975468044,
+          startLng: 113.78787851386144,
+          endLat: 35.48924769943459,
+          endLng: 139.74518826441798,
+          color: arcColor,
+        },
+        {
+          // US -> VN
+          startLat: 43.558037537937835,
+          startLng: -89.49127008240136,
+          endLat: 10.859316199964683,
+          endLng: 106.61806731035522,
+          color: arcColor,
+        },
+      ];
+
+      const colorInterpolator = (t) => `rgba(255,100,50,${1 - t})`;
+
+      fetch("./ne_110m_admin_0_countries.geojson")
+        .then((res) => res.json())
+        .then((countries) => {
+          const Globe = new ThreeGlobe()
+            .globeImageUrl("//unpkg.com/three-globe/example/img/earth-day.jpg")
+            .bumpImageUrl(
+              "//unpkg.com/three-globe/example/img/earth-topology.png",
+            )
+            .polygonsData(
+              countries.features.filter((d) => d.properties.ISO_A2 !== "AQ"),
+            )
+            .polygonCapColor(() => "rgba(0, 0, 0, 0.1)")
+            // .polygonSideColor(() => "rgba(200, 0, 0, 1)")
+            .polygonStrokeColor(() => "#ffffff")
+            .ringsData(gData)
+            .ringColor(() => colorInterpolator)
+            .ringMaxRadius("maxR")
+            .arcsData(arcsData)
+            .arcColor("color")
+            .arcStroke(1.3)
+            .polygonAltitude(0)
+            .ringPropagationSpeed("propagationSpeed")
+            .ringRepeatPeriod("repeatPeriod")
+            .htmlElementsData(gData)
+            .htmlElement((d) => {
+              const el = document.createElement("div");
+              el.innerHTML = markerSvg;
+              el.id = `map-marker-${d.id}`;
+              el.style.pointerEvents = "auto";
+              el.style.cursor = "pointer";
+              el.style.color = d.color;
+              el.style.width = `${d.size}px`;
+              el.onclick = () => {
+                const customEvent = new Event("marker-onclick");
+                window.dispatchEvent(customEvent);
+              };
+              return el;
+            });
+
+          // .globeImageUrl('//unpkg.com/three-globe/example/img/earth-dark.jpg')
+
+          // setTimeout(() => Globe.polygonAltitude(() => Math.random()), 4000);
+
+          // Setup renderer
+
+          const renderer = new THREE.WebGLRenderer();
+          const renderer2D = new CSS2DRenderer();
+          renderer2D.domElement.style.position = "absolute";
+          renderer2D.domElement.style.top = "0px";
+          renderer2D.domElement.style.pointerEvents = "none";
+          const container = document.getElementById("globeViz");
+
+          // Setup camera
+          const camera = new THREE.PerspectiveCamera();
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          camera.position.z = 300;
+
+          function updateRendererSize() {
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            renderer.setSize(width, height);
+            renderer2D.setSize(width, height);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+          }
+
+          window.addEventListener("resize", updateRendererSize);
+          const resizeObserver = new ResizeObserver(updateRendererSize);
+          resizeObserver.observe(container);
+
+          renderer.setSize(container.clientWidth, container.clientHeight);
+          renderer2D.setSize(container.clientWidth, container.clientHeight);
+          renderer.setPixelRatio(window.devicePixelRatio);
+          document.getElementById("globeViz").appendChild(renderer.domElement);
+          document
+            .getElementById("globeViz")
+            .appendChild(renderer2D.domElement);
+
+          // Setup scene
+          const scene = new THREE.Scene();
+          scene.add(Globe);
+
+          scene.background = new THREE.Color(0xffffff);
+          scene.add(new THREE.AmbientLight(0xffffff, Math.PI));
+          scene.add(new THREE.DirectionalLight(0xffffff, 0.6 * Math.PI));
+
+          // Add camera controls
+          const tbControls = new TrackballControls(camera, renderer.domElement);
+          tbControls.minDistance = 101;
+          tbControls.rotateSpeed = 2;
+          tbControls.zoomSpeed = 0.8;
+
+          // Globe.rotation.set(-0, 100);
+
+          // Update pov when camera moves
+          Globe.setPointOfView(camera);
+          tbControls.addEventListener("change", () =>
+            Globe.setPointOfView(camera),
+          );
+
+          // Kick-off renderer
+          (function animate() {
+            // IIFE
+            // Frame cycle
+            Globe.rotation.y -= 0.0003;
+            Globe.setPointOfView(camera);
+            tbControls.update();
+            renderer.render(scene, camera);
+            renderer2D.render(scene, camera);
+            requestAnimationFrame(animate);
+          })();
+        });
+    </script>
     <!--
       manifest.json provides metadata used when your web app is installed on a
       user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/

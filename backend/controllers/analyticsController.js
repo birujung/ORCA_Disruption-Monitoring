@@ -1,9 +1,9 @@
 /**
  * Disruption and Severity Analysis Endpoints
- * 
+ *
  * This module provides endpoints for querying disruption types, weekly disruption counts,
  * severity levels, and total severity counts from a MongoDB collection.
- * 
+ *
  * Dependencies:
  * - Requires `getDB` from the database configuration module to connect to the MongoDB instance.
  * - Expects the environment variable `COLLECTION_NAME` to specify the target collection.
@@ -14,12 +14,12 @@ const { getDB } = require("../config/db.js");
 
 /**
  * Endpoint: Get Totals for Each Disruption Type
- * 
+ *
  * This function retrieves the total number of disruptions grouped by disruption type.
- * 
+ *
  * - Null or undefined `disruptionType` fields are replaced with "Unknown".
  * - Results are sorted in descending order by total count.
- * 
+ *
  * @param {Object} req - Express request object.
  * @param {Object} res - Express response object.
  * @returns {JSON} An array of disruption types with their total counts.
@@ -31,23 +31,23 @@ const getDisruptionTypeTotals = async (req, res) => {
 
     const result = await collection
       .aggregate([
-        { 
-          $match: { isdeleted: { $ne: true } } 
+        {
+          $match: { isdeleted: { $ne: true } },
         },
-        { 
-          $group: { 
+        {
+          $group: {
             _id: { $ifNull: ["$disruptionType", "Unknown"] },
-            total: { $sum: 1 }
-          } 
+            total: { $sum: 1 },
+          },
         },
-        { 
-          $project: { 
-            disruptionType: "$_id", 
-            total: 1, 
-            _id: 0 
-          } 
+        {
+          $project: {
+            disruptionType: "$_id",
+            total: 1,
+            _id: 0,
+          },
         },
-        { $sort: { total: -1 } }
+        { $sort: { total: -1 } },
       ])
       .toArray();
 
@@ -60,9 +60,9 @@ const getDisruptionTypeTotals = async (req, res) => {
 
 /**
  * Helper Function: Get Last Week's Date Range
- * 
+ *
  * Calculates the start and end dates for the previous week.
- * 
+ *
  * @returns {Object} An object containing `start` and `end` Date objects.
  */
 const getLastWeekRange = () => {
@@ -80,14 +80,18 @@ const getLastWeekRange = () => {
 
 /**
  * Helper Function: Get Last Month's Date Range
- * 
+ *
  * Calculates the start and end dates for the previous month.
- * 
+ *
  * @returns {Object} An object containing `start` and `end` Date objects.
  */
 const getLastMonthRange = () => {
   const today = new Date();
-  const startOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const startOfLastMonth = new Date(
+    today.getFullYear(),
+    today.getMonth() - 1,
+    1,
+  );
   const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
   endOfLastMonth.setHours(23, 59, 59, 999);
 
@@ -97,12 +101,12 @@ const getLastMonthRange = () => {
 
 /**
  * Endpoint: Weekly Disruption Counts with Filter
- * 
+ *
  * This function retrieves the weekly disruption counts within a specific date range.
- * 
+ *
  * - Supports filtering by "lastweek" or "lastmonth".
  * - Results are grouped by week and disruption type.
- * 
+ *
  * @param {Object} req - Express request object, expects a `range` query parameter.
  * @param {Object} res - Express response object.
  * @returns {JSON} An array of disruption counts grouped by week and type.
@@ -119,7 +123,9 @@ const getWeeklyDisruptionTypeCounts = async (req, res) => {
     } else if (range === "lastmonth") {
       dateRange = getLastMonthRange();
     } else {
-      return res.status(400).json({ message: "Invalid range. Use 'lastweek' or 'lastmonth'." });
+      return res
+        .status(400)
+        .json({ message: "Invalid range. Use 'lastweek' or 'lastmonth'." });
     }
 
     const result = await collection
@@ -156,6 +162,7 @@ const getWeeklyDisruptionTypeCounts = async (req, res) => {
           },
         },
         { $sort: { week_start: 1 } },
+        { $limit: 50 },
       ])
       .toArray();
 
@@ -163,15 +170,17 @@ const getWeeklyDisruptionTypeCounts = async (req, res) => {
     res.status(200).json(result);
   } catch (error) {
     console.error("Error fetching weekly disruption counts:", error.message);
-    res.status(500).json({ message: "Error fetching weekly disruption counts." });
+    res
+      .status(500)
+      .json({ message: "Error fetching weekly disruption counts." });
   }
 };
 
 /**
  * Endpoint: Severity Level Counts with Filter
- * 
+ *
  * Retrieves severity level counts grouped by a specific period (week/month).
- * 
+ *
  * @param {Object} req - Express request object, expects `range` and `period` query parameters.
  * @param {Object} res - Express response object.
  * @returns {JSON} An array of severity level counts grouped by period.
@@ -189,7 +198,9 @@ const getSeverityLevelCounts = async (req, res) => {
     } else if (range === "lastmonth") {
       dateRange = getLastMonthRange();
     } else {
-      return res.status(400).json({ message: "Invalid range. Use 'lastweek' or 'lastmonth'." });
+      return res
+        .status(400)
+        .json({ message: "Invalid range. Use 'lastweek' or 'lastmonth'." });
     }
 
     const truncUnit = period === "month" ? "month" : "week";
@@ -213,7 +224,9 @@ const getSeverityLevelCounts = async (req, res) => {
         {
           $group: {
             _id: {
-              period: { $dateTrunc: { date: "$publishedDate", unit: truncUnit } },
+              period: {
+                $dateTrunc: { date: "$publishedDate", unit: truncUnit },
+              },
               severity: "$severity",
             },
             total: { $sum: 1 },
@@ -241,9 +254,9 @@ const getSeverityLevelCounts = async (req, res) => {
 
 /**
  * Endpoint: Total Severity Counts
- * 
+ *
  * Retrieves the total count of articles grouped by severity.
- * 
+ *
  * @param {Object} req - Express request object.
  * @param {Object} res - Express response object.
  * @returns {JSON} An array of total severity counts.
